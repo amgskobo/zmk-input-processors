@@ -21,6 +21,7 @@ struct absolute_to_relative_config {
 
 struct absolute_to_relative_data {
     uint16_t previous_x, previous_y;
+    int16_t previous_dx, previous_dy;
     bool touching_x, touching_y;
     const struct device *dev;
     struct k_work_delayable touch_end_timeout_work;
@@ -36,22 +37,34 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
     if (event->type == INPUT_EV_ABS) {
         uint16_t value = event->value;
 
-        if (data->touching_x && event->code == INPUT_ABS_X) {
-                event->type = INPUT_EV_REL;
-                event->code = INPUT_REL_X;
-                event->value -= data->previous_x;
+        if (event->code == INPUT_ABS_X) {
+            if (!data->touching_x) {
+                data->touching_x = true;
                 data->previous_x = value;
-        } else if (data->touching_y && event->code == INPUT_ABS_Y) {
-                event->type = INPUT_EV_REL;
-                event->code = INPUT_REL_Y;
-                event->value -= data->previous_y;
+                data->previous_dx = 0;
+                return ZMK_INPUT_PROC_CONTINUE;
+            }
+            int16_t dx = (int16_t)value - (int16_t)data->previous_x;
+            int16_t smooth_dx = (dx + data->previous_dx) >> 1;
+            event->type = INPUT_EV_REL;
+            event->code = INPUT_REL_X;
+            event->value = smooth_dx;
+            data->previous_dx = dx;
+            data->previous_x = value;
+        } else if (event->code == INPUT_ABS_Y) {
+            if (!data->touching_y) {
+                data->touching_y = true;
                 data->previous_y = value;
-        } else if (!data->touching_x && event->code == INPUT_ABS_X) {
-            data->touching_x = true;
-            data->previous_x = event->value;
-        } else if (!data->touching_y && event->code == INPUT_ABS_Y) { 
-            data->touching_y = true;
-            data->previous_y = event->value;
+                data->previous_dy = 0;
+                return ZMK_INPUT_PROC_CONTINUE;
+            }
+            int16_t dy = (int16_t)value - (int16_t)data->previous_y;
+            int16_t smooth_dy = (dy + data->previous_dy) >> 1;
+            event->type = INPUT_EV_REL;
+            event->code = INPUT_REL_Y;
+            event->value = smooth_dy;
+            data->previous_dy = dy;
+            data->previous_y = value;
         }
     }
 
@@ -81,6 +94,8 @@ static const struct zmk_input_processor_driver_api absolute_to_relative_driver_a
     static struct absolute_to_relative_data processor_absolute_to_relative_data_##n = {                 \
         .touching_x = false,                                                                              \
         .touching_y = false,                                                                              \
+        .previous_dx = 0,                                                                                 \
+        .previous_dy = 0,                                                                                 \
     };                                                                                                  \
     static const struct absolute_to_relative_config processor_absolute_to_relative_config_##n = {       \
         .time_between_normal_reports = 70,             \

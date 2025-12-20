@@ -40,6 +40,24 @@ When implementing input processor drivers, always include these Zephyr headers:
   ```
   Returns `ZMK_INPUT_PROC_CONTINUE` or appropriate status code.
 
+- **Smoothing pattern** (if needed for motion data):
+  ```c
+  if (!data->touching) {
+      // First touch: initialize state, don't output event
+      data->touching = true;
+      data->previous_pos = value;
+      data->previous_delta = 0;
+      return ZMK_INPUT_PROC_CONTINUE;
+  }
+  // Subsequent touches: apply smoothing
+  int16_t delta = (int16_t)value - (int16_t)data->previous_pos;
+  int16_t smooth_delta = (delta + data->previous_delta) >> 1;
+  event->value = smooth_delta;
+  data->previous_delta = delta;
+  data->previous_pos = value;
+  ```
+  Use `>> 1` (bit shift) for division by 2 for efficiency. Store both previous position and previous delta. Early return on first touch prevents spurious movement events.
+
 - **Delayed work** is done via Zephyr's `k_work_delayable` primitives:
   - `k_work_init_delayable()` in init function
   - `k_work_reschedule()` to schedule work
@@ -70,7 +88,7 @@ When implementing input processor drivers, always include these Zephyr headers:
 
 - **Compatible string**: `zmk,input-processor-absolute-to-relative` (defined in [zephyr/module.yml](../zephyr/module.yml) with `dts_root`).
 - **DTS example**: [dts/behaviors/input_processor_absolute_to_relative.dtsi](../dts/behaviors/input_processor_absolute_to_relative.dtsi) shows how to instantiate the driver with `status = "okay"` and `#input-processor-cells = <0>`.
-- **Binding schema**: [dts/bindings/zmk,input-processor-absolute-to-relative.yaml](../dts/bindings/zmk,input-processor-absolute-to-relative.yaml) documents properties and includes `ip_zero_param.yaml`.
+- **Binding schema**: [dts/bindings/zmk,input-processor-absolute-to-relative.yaml](../dts/bindings/zmk,input-processor-absolute-to-relative.yaml) documents properties for the input processor.
 
 ## Adding or Updating an Input Processor
 
@@ -104,7 +122,9 @@ When implementing input processor drivers, always include these Zephyr headers:
    ```yaml
    description: ...
    compatible: "zmk,input-processor-my-new-processor"
-   include: ip_zero_param.yaml
+   properties:
+     "#input-processor-cells":
+       const: 0
    ```
 
 5. **Provide example behavior** ([dts/behaviors/input_processor_my_new_processor.dtsi](../dts/behaviors/)):
@@ -136,6 +156,9 @@ When implementing input processor drivers, always include these Zephyr headers:
 - **Init priority**: Use `CONFIG_KERNEL_INIT_PRIORITY_DEFAULT` (not custom config constants) for consistency with Zephyr best practices.
 - **Minimal footprint**: Input processors are typically small—prefer Zephyr device/DT APIs over external dependencies.
 - **Logging overhead**: Only use `LOG_INF` for debugging during development; consider removing or conditionalizing for production.
+- **Type casting**: When converting between `uint16_t` and `int16_t` for delta calculations, explicitly cast both operands to `int16_t` before subtraction to avoid signed/unsigned conversion issues and potential wraparound problems.
+- **Independent axis tracking**: The absolute-to-relative processor tracks X and Y axes independently with separate touch states and timeout handlers. This design assumes single-touch input and may not be suitable for multi-touch scenarios.
+- **Early return on first touch**: When initializing smoothing state on first touch, use `return ZMK_INPUT_PROC_CONTINUE` to prevent the initial position from being output as a movement event. This provides clean startup without spurious inputs.
 
 ## Key Files & Examples
 
