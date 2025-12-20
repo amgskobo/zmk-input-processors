@@ -28,9 +28,11 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
     struct absolute_to_relative_data *data = (struct absolute_to_relative_data *)dev->data;
 
     k_work_reschedule(&data->touch_end_timeout_work, K_MSEC(config->time_between_normal_reports));
+    LOG_INF("Starting touch");
 
     if (event->type == INPUT_EV_ABS) {
         uint16_t value = event->value;
+        LOG_INF("Starting touch");
 
         if (data->touching_x && event->code == INPUT_ABS_X) {
                 event->type = INPUT_EV_REL;
