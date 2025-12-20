@@ -4,7 +4,7 @@ A Zephyr module that provides input processors for ZMK (Zephyr Mechanical Keyboa
 
 ## Features
 
-- **Absolute to Relative Processor** — Converts absolute mouse coordinates to relative movements with configurable report timing
+- **Absolute to Relative Processor** — Converts absolute mouse coordinates to relative movements with smoothing and configurable report timing
 - Modular architecture for adding new input processors
 - Device tree configuration support
 - Conditional build system via Kconfig
@@ -62,7 +62,9 @@ In your keyboard's device tree file (`.keymap` or DTS), enable the processor:
 
 Then wire it into your input handler chain according to your ZMK configuration.
 
-**Note**: The processor uses a fixed 70ms report timing. This value is hardcoded and not configurable via device tree.
+**Note**: The processor uses a fixed 70ms report timing. This value is hardcoded and not configurable via device tree. 
+
+**Smoothing Behavior**: Movement data is smoothed by averaging the current delta with the previous delta using: `smooth_delta = (current_delta + previous_delta) >> 1`. First touch initializes state with zero delta and doesn't output an event; smoothing begins on the second movement event.
 
 ## Project Structure
 
@@ -81,7 +83,6 @@ Then wire it into your input handler chain according to your ZMK configuration.
 │   ├── behaviors/
 │   │   └── input_processor_absolute_to_relative.dtsi
 │   └── bindings/
-│       ├── ip_zero_param.yaml        # Common binding include
 │       └── zmk,input-processor-absolute-to-relative.yaml
 ├── zephyr/
 │   └── module.yml                    # Zephyr module registration
@@ -120,7 +121,9 @@ See [.github/copilot-instructions.md](.github/copilot-instructions.md) for detai
 4. **Create DTS binding** (`dts/bindings/zmk,input-processor-my-processor.yaml`)
    ```yaml
    compatible: "zmk,input-processor-my-processor"
-   include: ip_zero_param.yaml
+   properties:
+     "#input-processor-cells":
+       const: 0
    ```
 
 5. **Provide example** (`dts/behaviors/input_processor_my_processor.dtsi`)
@@ -137,6 +140,7 @@ See [.github/copilot-instructions.md](.github/copilot-instructions.md) for detai
 ### Key Code Patterns
 
 - **Device tree config**: Use `DT_INST_PROP_OR(n, prop, default)` for device-tree-backed values
+- **Motion smoothing**: Store both previous position and previous delta; average current delta with previous delta using `(dx + prev_dx) >> 1`
 - **Delayed work**: Use Zephyr's `k_work_delayable` primitives (`k_work_init_delayable`, `k_work_reschedule`)
 - **Multi-instance callbacks**: Use `CONTAINER_OF()` to retrieve driver state from work struct (not `DEVICE_DT_INST_GET(0)`)
 - **Logging**: Use `LOG_MODULE_REGISTER(name, CONFIG_ZMK_LOG_LEVEL)` and `LOG_INF()` for debugging
