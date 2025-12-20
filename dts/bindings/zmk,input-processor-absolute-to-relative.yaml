@@ -1,7 +1,7 @@
-# Copyright (c) 2021 The ZMK Contributors
+# Copyright (c) 2024 The ZMK Contributors
 # SPDX-License-Identifier: MIT
 
-description: Converts absolute mouse movements to relative ones and instantly reports them
+description: Converts absolute mouse movements to relative ones with smoothing and reports at configurable intervals
 
 compatible: "zmk,input-processor-absolute-to-relative"
 
