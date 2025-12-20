@@ -57,11 +57,12 @@ In your keyboard's device tree file (`.keymap` or DTS), enable the processor:
 ```dts
 &zip_absolute_to_relative {
     status = "okay";
-    time-between-normal-reports = <30>;  // milliseconds
 };
 ```
 
 Then wire it into your input handler chain according to your ZMK configuration.
+
+**Note**: The processor uses a fixed 70ms report timing. This value is hardcoded and not configurable via device tree.
 
 ## Project Structure
 

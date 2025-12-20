@@ -30,7 +30,7 @@ When implementing input processor drivers, always include these Zephyr headers:
 - **Device driver instances** are declared with `DEVICE_DT_INST_DEFINE(...)` macro (see `ABSOLUTE_TO_RELATIVE_INST` macro in [input_processor_absolute_to_relative.c](../drivers/input/input_processor_absolute_to_relative.c)).
   - Uses `CONFIG_KERNEL_INIT_PRIORITY_DEFAULT` for initialization priority (not custom config constants).
 
-- **Device tree config** is read via `DT_INST_PROP_OR(n, prop, default)` for device-tree-backed values (example: `time_between_normal_reports`).
+- **Device tree config** is read via `DT_INST_PROP_OR(n, prop, default)` for device-tree-backed values. For this driver, `time_between_normal_reports` is hardcoded to 70ms and not exposed to device tree.
 
 - **Event handler signature** (required by `zmk_input_processor_driver_api`):
   ```c
