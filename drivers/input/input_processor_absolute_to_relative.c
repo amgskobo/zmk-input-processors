@@ -83,7 +83,7 @@ static const struct zmk_input_processor_driver_api absolute_to_relative_driver_a
         .touching_y = false,                                                                              \
     };                                                                                                  \
     static const struct absolute_to_relative_config processor_absolute_to_relative_config_##n = {       \
-        .time_between_normal_reports = DT_INST_PROP_OR(n, time_between_normal_reports, 30),             \
+        .time_between_normal_reports = 70,             \
     };                                                                                                  \
     DEVICE_DT_INST_DEFINE(n, absolute_to_relative_init, NULL, &processor_absolute_to_relative_data_##n, \
                           &processor_absolute_to_relative_config_##n, POST_KERNEL,                      \
