@@ -6,8 +6,12 @@
 
 #define DT_DRV_COMPAT zmk_input_processor_absolute_to_relative
 
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/input/input.h>
 #include <drivers/input_processor.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/util.h>
 
 LOG_MODULE_REGISTER(absolute_to_relative, CONFIG_ZMK_LOG_LEVEL);
 
@@ -57,14 +61,15 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
 }
 
 static void touch_end_timeout_callback(struct k_work *work) {
-    const struct device *dev = DEVICE_DT_INST_GET(0);
-    struct absolute_to_relative_data *data = (struct absolute_to_relative_data *)dev->data;
+    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+    struct absolute_to_relative_data *data = CONTAINER_OF(dwork, struct absolute_to_relative_data, touch_end_timeout_work);
     data->touching_x = false;
     data->touching_y = false;
 }
 
 static int absolute_to_relative_init(const struct device *dev) {
     struct absolute_to_relative_data *data = (struct absolute_to_relative_data *)dev->data;
+    data->dev = dev;
     k_work_init_delayable(&data->touch_end_timeout_work, touch_end_timeout_callback);
 
     return 0;
@@ -84,6 +89,6 @@ static const struct zmk_input_processor_driver_api absolute_to_relative_driver_a
     };                                                                                                  \
     DEVICE_DT_INST_DEFINE(n, absolute_to_relative_init, NULL, &processor_absolute_to_relative_data_##n, \
                           &processor_absolute_to_relative_config_##n, POST_KERNEL,                      \
-                          CONFIG_INPUT_PROCESSOR_ABSOLUTE_TO_RELATIVE_INIT_PRIORITY, &absolute_to_relative_driver_api);
+                          CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &absolute_to_relative_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(ABSOLUTE_TO_RELATIVE_INST)
