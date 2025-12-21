@@ -49,14 +49,19 @@ west build -b <board> -s <app-dir>
 ```
 
 ## Usage
-
+### include input_processor_absolute_to_relative.dtsi
+```dts
+// Absolute converter include
+#include <behaviors/input_processor_absolute_to_relative.dtsi>
+```
 ### Enable the Absolute to Relative Processor
 
 In your keyboard's device tree file (`.keymap` or DTS), enable the processor:
 
 ```dts
-&zip_absolute_to_relative {
-    status = "okay";
+/* Assign to Listener */
+&trackpad_listener {
+    input-processors = <&zip_absolute_to_relative>;
 };
 ```
 
