@@ -37,6 +37,11 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
     if (event->type == INPUT_EV_ABS) {
         uint16_t value = event->value;
 
+        // Skip processing maximum values (likely sensor error/invalid state)
+        if (value == UINT16_MAX) {
+            return ZMK_INPUT_PROC_CONTINUE;
+        }
+
         if (event->code == INPUT_ABS_X) {
             if (!data->touching_x) {
                 data->touching_x = true;
