@@ -6,8 +6,8 @@
         #input-processor-cells = <0>;
         /* Example properties (set to <1> to enable) */
         /* If set to <1>, INPUT_BTN_TOUCH events are suppressed (not forwarded). */
-        suppress-btn-touch;
+        // suppress-btn-touch;
         /* If set to <1>, INPUT_BTN_0 events are suppressed (not forwarded). */
-        suppress-btn0;
+        // suppress-btn0;
     };
 };
