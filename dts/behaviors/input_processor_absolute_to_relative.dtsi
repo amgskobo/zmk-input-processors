@@ -4,5 +4,7 @@
         status = "okay";
         compatible = "zmk,input-processor-absolute-to-relative";
         #input-processor-cells = <0>;
+        /* If set to true, INPUT_BTN_TOUCH events are suppressed (not forwarded). */
+        suppress-btn-touch;
     };
 };

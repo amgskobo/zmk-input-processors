@@ -6,3 +6,12 @@ description: Converts absolute mouse movements to relative ones with smoothing a
 compatible: "zmk,input-processor-absolute-to-relative"
 
 include: ip_zero_param.yaml
+
+properties:
+  suppress-btn-touch:
+    description: >-
+      If true, the input processor will suppress INPUT_BTN_TOUCH events (used
+      to control touch state) so they are not forwarded to downstream
+      consumers.
+    type: boolean
+    default: false
