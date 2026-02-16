@@ -16,15 +16,13 @@
 LOG_MODULE_REGISTER(absolute_to_relative, CONFIG_ZMK_LOG_LEVEL);
 
 struct absolute_to_relative_config {
-    uint8_t time_between_normal_reports;
 };
 
 struct absolute_to_relative_data {
     uint16_t previous_x, previous_y;
     int16_t previous_dx, previous_dy;
-    bool touching_x, touching_y;
+    bool touching;
     const struct device *dev;
-    struct k_work_delayable touch_end_timeout_work;
 };
  
 static int absolute_to_relative_handle_event(const struct device *dev, struct input_event *event, uint32_t param1,
@@ -32,19 +30,22 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
     const struct absolute_to_relative_config *config = dev->config;
     struct absolute_to_relative_data *data = (struct absolute_to_relative_data *)dev->data;
 
-    k_work_reschedule(&data->touch_end_timeout_work, K_MSEC(config->time_between_normal_reports));
+    // Handle touch control via INPUT_BTN_TOUCH event
+    if (event->type == INPUT_EV_KEY && event->code == INPUT_BTN_TOUCH) {
+        data->touching = (event->value != 0);
+        return ZMK_INPUT_PROC_CONTINUE;
+    }
+
+    // Only process absolute events if touch is active
+    if (!data->touching) {
+        return ZMK_INPUT_PROC_CONTINUE;
+    }
 
     if (event->type == INPUT_EV_ABS) {
         uint16_t value = event->value;
 
-        // Skip processing maximum values (likely sensor error/invalid state)
-        if (value == UINT16_MAX) {
-            return ZMK_INPUT_PROC_CONTINUE;
-        }
-
         if (event->code == INPUT_ABS_X) {
-            if (!data->touching_x) {
-                data->touching_x = true;
+            if (data->previous_x == 0) {
                 data->previous_x = value;
                 data->previous_dx = 0;
                 return ZMK_INPUT_PROC_CONTINUE;
@@ -57,8 +58,7 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
             data->previous_dx = dx;
             data->previous_x = value;
         } else if (event->code == INPUT_ABS_Y) {
-            if (!data->touching_y) {
-                data->touching_y = true;
+            if (data->previous_y == 0) {
                 data->previous_y = value;
                 data->previous_dy = 0;
                 return ZMK_INPUT_PROC_CONTINUE;
@@ -76,17 +76,9 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
     return ZMK_INPUT_PROC_CONTINUE;
 }
 
-static void touch_end_timeout_callback(struct k_work *work) {
-    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
-    struct absolute_to_relative_data *data = CONTAINER_OF(dwork, struct absolute_to_relative_data, touch_end_timeout_work);
-    data->touching_x = false;
-    data->touching_y = false;
-}
-
 static int absolute_to_relative_init(const struct device *dev) {
     struct absolute_to_relative_data *data = (struct absolute_to_relative_data *)dev->data;
     data->dev = dev;
-    k_work_init_delayable(&data->touch_end_timeout_work, touch_end_timeout_callback);
 
     return 0;
 }
@@ -97,13 +89,11 @@ static const struct zmk_input_processor_driver_api absolute_to_relative_driver_a
 
 #define ABSOLUTE_TO_RELATIVE_INST(n)                                                                    \
     static struct absolute_to_relative_data processor_absolute_to_relative_data_##n = {                 \
-        .touching_x = false,                                                                              \
-        .touching_y = false,                                                                              \
+        .touching = false,                                                                                \
         .previous_dx = 0,                                                                                 \
         .previous_dy = 0,                                                                                 \
     };                                                                                                  \
     static const struct absolute_to_relative_config processor_absolute_to_relative_config_##n = {       \
-        .time_between_normal_reports = 70,             \
     };                                                                                                  \
     DEVICE_DT_INST_DEFINE(n, absolute_to_relative_init, NULL, &processor_absolute_to_relative_data_##n, \
                           &processor_absolute_to_relative_config_##n, POST_KERNEL,                      \
