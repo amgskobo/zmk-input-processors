@@ -32,6 +32,11 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
 
     // Handle touch control via INPUT_BTN_TOUCH event
     if (event->type == INPUT_EV_KEY && event->code == INPUT_BTN_TOUCH) {
+        if (event->value == 0) {
+            // Touch released - reset coordinates
+            data->previous_x = 0;
+            data->previous_y = 0;
+        }
         data->touching = (event->value != 0);
         return ZMK_INPUT_PROC_CONTINUE;
     }
