@@ -14,4 +14,3 @@ properties:
       to control touch state) so they are not forwarded to downstream
       consumers.
     type: boolean
-    default: false
