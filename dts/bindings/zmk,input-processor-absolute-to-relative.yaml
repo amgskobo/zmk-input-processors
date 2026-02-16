@@ -14,3 +14,8 @@ properties:
       to control touch state) so they are not forwarded to downstream
       consumers.
     type: boolean
+  suppress-btn0:
+    description: >-
+      If true, the input processor will suppress INPUT_BTN_0 events so they
+      are not forwarded to downstream consumers.
+    type: boolean

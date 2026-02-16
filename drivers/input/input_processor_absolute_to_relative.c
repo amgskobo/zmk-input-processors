@@ -18,6 +18,7 @@ LOG_MODULE_REGISTER(absolute_to_relative, CONFIG_ZMK_LOG_LEVEL);
 
 struct absolute_to_relative_config {
     bool suppress_btn_touch;
+    bool suppress_btn0;
 };
 
 struct absolute_to_relative_data {
@@ -41,6 +42,16 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
         }
         data->touching = (event->value != 0);
         if (config->suppress_btn_touch) {
+            event->code = 0xFFF;
+            event->sync = false;
+            return ZMK_INPUT_PROC_STOP;
+        }
+        return ZMK_INPUT_PROC_CONTINUE;
+    }
+
+    /* Optionally suppress BTN_0 events */
+    if (event->type == INPUT_EV_KEY && event->code == INPUT_BTN_0) {
+        if (config->suppress_btn0) {
             event->code = 0xFFF;
             event->sync = false;
             return ZMK_INPUT_PROC_STOP;
@@ -109,6 +120,7 @@ static const struct zmk_input_processor_driver_api absolute_to_relative_driver_a
     };                                                                                                  \
     static const struct absolute_to_relative_config processor_absolute_to_relative_config_##n = {       \
         .suppress_btn_touch = DT_INST_PROP_OR(n, suppress_btn_touch, false),                             \
+        .suppress_btn0 = DT_INST_PROP_OR(n, suppress_btn0, false),                                       \
     };                                                                                                  \
     DEVICE_DT_INST_DEFINE(n, absolute_to_relative_init, NULL, &processor_absolute_to_relative_data_##n, \
                           &processor_absolute_to_relative_config_##n, POST_KERNEL,                      \
