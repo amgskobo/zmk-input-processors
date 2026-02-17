@@ -37,11 +37,15 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
     if (event->type == INPUT_EV_KEY && event->code == INPUT_BTN_TOUCH) {
         if (event->value == 0) {
             // Touch released - reset coordinates
+            LOG_DBG("Touch released");
             data->previous_x = UINT16_MAX;
             data->previous_y = UINT16_MAX;
+        } else {
+            LOG_DBG("Touch started");
         }
         data->touching = (event->value != 0);
         if (config->suppress_btn_touch) {
+            LOG_DBG("Suppressing BTN_TOUCH event");
             event->code = 0xFFF;
             event->sync = false;
             return ZMK_INPUT_PROC_STOP;
@@ -52,6 +56,7 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
     /* Optionally suppress BTN_0 events */
     if (event->type == INPUT_EV_KEY && event->code == INPUT_BTN_0) {
         if (config->suppress_btn0) {
+            LOG_DBG("Suppressing BTN_0 event");
             event->code = 0xFFF;
             event->sync = false;
             return ZMK_INPUT_PROC_STOP;
@@ -69,12 +74,14 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
 
         if (event->code == INPUT_ABS_X) {
             if (data->previous_x == UINT16_MAX) {
+                LOG_DBG("Initial X position: %u", value);
                 data->previous_x = value;
                 data->previous_dx = 0;
                 return ZMK_INPUT_PROC_CONTINUE;
             }
             int16_t dx = (int16_t)value - (int16_t)data->previous_x;
             int16_t smooth_dx = (dx + data->previous_dx) >> 1;
+            LOG_DBG("X: %u -> rel_x: %d (raw_dx: %d, smooth_dx: %d)", value, smooth_dx, dx, smooth_dx);
             event->type = INPUT_EV_REL;
             event->code = INPUT_REL_X;
             event->value = smooth_dx;
@@ -82,12 +89,14 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
             data->previous_x = value;
         } else if (event->code == INPUT_ABS_Y) {
             if (data->previous_y == UINT16_MAX) {
+                LOG_DBG("Initial Y position: %u", value);
                 data->previous_y = value;
                 data->previous_dy = 0;
                 return ZMK_INPUT_PROC_CONTINUE;
             }
             int16_t dy = (int16_t)value - (int16_t)data->previous_y;
             int16_t smooth_dy = (dy + data->previous_dy) >> 1;
+            LOG_DBG("Y: %u -> rel_y: %d (raw_dy: %d, smooth_dy: %d)", value, smooth_dy, dy, smooth_dy);
             event->type = INPUT_EV_REL;
             event->code = INPUT_REL_Y;
             event->value = smooth_dy;
@@ -102,6 +111,10 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
 static int absolute_to_relative_init(const struct device *dev) {
     struct absolute_to_relative_data *data = (struct absolute_to_relative_data *)dev->data;
     data->dev = dev;
+    
+    const struct absolute_to_relative_config *config = dev->config;
+    LOG_INF("Initialized. suppress_btn_touch: %d, suppress_btn0: %d", 
+            config->suppress_btn_touch, config->suppress_btn0);
 
     return 0;
 }
