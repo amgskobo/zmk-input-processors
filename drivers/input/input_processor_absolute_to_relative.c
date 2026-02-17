@@ -35,42 +35,49 @@ struct absolute_to_relative_data {
 /**
  * Initialize coordinates when touch starts
  */
-static void touch_init(struct absolute_to_relative_data *data) {
+static inline void touch_init(struct absolute_to_relative_data *data) {
     data->previous_x = COORD_UNINITIALIZED;
     data->previous_y = COORD_UNINITIALIZED;
     data->previous_dx = 0;
     data->previous_dy = 0;
-    LOG_DBG("Touch started - coordinates initialized");
+    if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
+        LOG_DBG("Touch started - coordinates initialized");
+    }
 }
 
 /**
  * Process absolute-to-relative conversion for a single axis
  * Returns true if first position (should suppress event), false if normal motion
  */
-static bool process_axis(struct input_event *event, uint16_t *previous_pos, int16_t *previous_delta,
+static inline bool process_axis(struct input_event *event, uint16_t *previous_pos, int16_t *previous_delta,
                          uint16_t rel_code) {
-    uint16_t value = event->value;
+    const uint16_t value = event->value;
 
-    if (*previous_pos == COORD_UNINITIALIZED) {
+    uint16_t prev = *previous_pos;
+    if (prev == COORD_UNINITIALIZED) {
         /* First report on this axis - store position and suppress output */
         *previous_pos = value;
         *previous_delta = 0;
-        LOG_DBG("Initial %s position: %u (suppressed)", (rel_code == INPUT_REL_X) ? "X" : "Y", value);
-        
+        if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
+            LOG_DBG("Initial %s position: %u (suppressed)", (rel_code == INPUT_REL_X) ? "X" : "Y", value);
+        }
+
         /* Mark event as invalid for clarity */
         event->code = COORD_INVALID_ZERO;
         event->sync = false;
-        
+
         return true; /* Signal to suppress this event */
     }
 
-    /* Calculate delta and apply smoothing */
-    int16_t delta = (int16_t)value - (int16_t)(*previous_pos);
+    /* Calculate delta and apply smoothing (use local prev to reduce memory access) */
+    int16_t delta = (int16_t)value - (int16_t)prev;
     int16_t smooth_delta = (delta + *previous_delta) >> 1;
 
-    LOG_DBG("%s: %u -> rel_%s: %d (raw_delta: %d, smoothed: %d)",
-            (rel_code == INPUT_REL_X) ? "X" : "Y", value,
-            (rel_code == INPUT_REL_X) ? "x" : "y", smooth_delta, delta, smooth_delta);
+    if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
+        LOG_DBG("%s: %u -> rel_%s: %d (raw_delta: %d, smoothed: %d)",
+                (rel_code == INPUT_REL_X) ? "X" : "Y", value,
+                (rel_code == INPUT_REL_X) ? "x" : "y", smooth_delta, delta, smooth_delta);
+    }
 
     /* Update event and state */
     event->type = INPUT_EV_REL;
@@ -94,11 +101,15 @@ static int handle_touch_button(struct input_event *event, struct absolute_to_rel
     } else {
         /* Touch ended */
         data->touching = false;
-        LOG_DBG("Touch released");
+        if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
+            LOG_DBG("Touch released");
+        }
     }
 
     if (config->suppress_btn_touch) {
-        LOG_DBG("Suppressing BTN_TOUCH");
+        if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
+            LOG_DBG("Suppressing BTN_TOUCH");
+        }
         event->code = COORD_INVALID_ZERO;
         event->sync = false;
         return ZMK_INPUT_PROC_STOP;
@@ -112,7 +123,9 @@ static int handle_touch_button(struct input_event *event, struct absolute_to_rel
  */
 static int handle_button_suppress(struct input_event *event, const struct absolute_to_relative_config *config) {
     if (config->suppress_btn0) {
-        LOG_DBG("Suppressing BTN_0");
+        if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
+            LOG_DBG("Suppressing BTN_0");
+        }
         event->code = COORD_INVALID_ZERO;
         event->sync = false;
         return ZMK_INPUT_PROC_STOP;
