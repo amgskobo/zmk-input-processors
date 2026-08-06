@@ -29,6 +29,15 @@ struct absolute_to_relative_data {
     uint16_t previous_x, previous_y;
     int16_t previous_dx, previous_dy;
     bool touching;
+    /*
+     * Set while a BTN_0 press has been suppressed here and its release has not
+     * been seen yet. Suppression has to stay paired: which processors run is
+     * decided per event from the layer active at that moment, so a press and
+     * its release can be routed differently when the layer changes in between.
+     * Dropping a release whose press was never suppressed leaves the button
+     * held down on the host with nothing left to release it.
+     */
+    bool btn0_press_suppressed;
     const struct device *dev;
 };
 
@@ -120,17 +129,34 @@ static int handle_touch_button(struct input_event *event, struct absolute_to_rel
 
 /**
  * Handle button suppression (BTN_0)
+ *
+ * A release is only dropped when the matching press was dropped here. A press
+ * that reached the host on another layer keeps its release, so the button can
+ * never be left stuck down.
  */
-static int handle_button_suppress(struct input_event *event, const struct absolute_to_relative_config *config) {
-    if (config->suppress_btn0) {
-        if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
-            LOG_DBG("Suppressing BTN_0");
-        }
-        event->code = COORD_INVALID_ZERO;
-        event->sync = false;
-        return ZMK_INPUT_PROC_STOP;
+static int handle_button_suppress(struct input_event *event, struct absolute_to_relative_data *data,
+                                  const struct absolute_to_relative_config *config) {
+    if (!config->suppress_btn0) {
+        /* Not suppressing here, so nothing of ours is outstanding. */
+        data->btn0_press_suppressed = false;
+        return ZMK_INPUT_PROC_CONTINUE;
     }
-    return ZMK_INPUT_PROC_CONTINUE;
+
+    if (event->value) {
+        data->btn0_press_suppressed = true;
+    } else if (!data->btn0_press_suppressed) {
+        LOG_WRN("Passing BTN_0 release: its press was not suppressed here");
+        return ZMK_INPUT_PROC_CONTINUE;
+    } else {
+        data->btn0_press_suppressed = false;
+    }
+
+    if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
+        LOG_DBG("Suppressing BTN_0 %s", event->value ? "press" : "release");
+    }
+    event->code = COORD_INVALID_ZERO;
+    event->sync = false;
+    return ZMK_INPUT_PROC_STOP;
 }
 
 /**
@@ -148,7 +174,7 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
             return handle_touch_button(event, data, config);
         }
         if (event->code == INPUT_BTN_0) {
-            return handle_button_suppress(event, config);
+            return handle_button_suppress(event, data, config);
         }
     }
 
@@ -182,6 +208,7 @@ static int absolute_to_relative_init(const struct device *dev) {
 
     data->dev = dev;
     data->touching = false;
+    data->btn0_press_suppressed = false;
 
     LOG_INF("Initialized (suppress_btn_touch=%d, suppress_btn0=%d)",
             config->suppress_btn_touch, config->suppress_btn0);
