@@ -13,6 +13,9 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/devicetree.h>
+#include <zephyr/spinlock.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/layer_state_changed.h>
 
 LOG_MODULE_REGISTER(absolute_to_relative, CONFIG_ZMK_LOG_LEVEL);
 
@@ -26,6 +29,13 @@ struct absolute_to_relative_config {
 };
 
 struct absolute_to_relative_data {
+    /*
+     * Guards the reference point below. It is read on the input thread and
+     * dropped from whichever thread raises a layer change, and a change landing
+     * between the two axes of one sample would convert one of them against the
+     * old reference - the very jump this reference is dropped to avoid.
+     */
+    struct k_spinlock lock;
     uint16_t previous_x, previous_y;
     int16_t previous_dx, previous_dy;
     bool touching;
@@ -106,7 +116,9 @@ static int handle_touch_button(struct input_event *event, struct absolute_to_rel
     if (event->value == 1) {
         /* Touch started */
         data->touching = true;
+        k_spinlock_key_t key = k_spin_lock(&data->lock);
         touch_init(data);
+        k_spin_unlock(&data->lock, key);
     } else {
         /* Touch ended */
         data->touching = false;
@@ -185,12 +197,14 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
 
     /* Convert absolute axes to relative motion */
     bool suppress_event = false;
-    
+
+    k_spinlock_key_t key = k_spin_lock(&data->lock);
     if (event->code == INPUT_ABS_X) {
         suppress_event = process_axis(event, &data->previous_x, &data->previous_dx, INPUT_REL_X);
     } else if (event->code == INPUT_ABS_Y) {
         suppress_event = process_axis(event, &data->previous_y, &data->previous_dy, INPUT_REL_Y);
     }
+    k_spin_unlock(&data->lock, key);
 
     if (suppress_event) {
         return ZMK_INPUT_PROC_STOP;
@@ -246,3 +260,42 @@ static const struct zmk_input_processor_driver_api absolute_to_relative_driver_a
                           &absolute_to_relative_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(ABSOLUTE_TO_RELATIVE_INST)
+
+/**
+ * Drop the reference point when the layer changes.
+ *
+ * Which processors run is decided per event from the layer active at that
+ * moment, so one contact can be split across two instances of this processor.
+ * The instance the contact moves to has a reference point left over from an
+ * earlier contact, and the first sample it sees is turned into the distance
+ * between two unrelated touches - a single delta of up to the whole pad, which
+ * an acceleration or inertia stage downstream then multiplies.
+ *
+ * Dropping the reference costs the one sample spent re-establishing it, the
+ * same sample every contact already spends when it starts.
+ *
+ * The touch flag is deliberately left alone. Clearing it would silence a
+ * contact until the finger lifted, which on a board that keeps one instance
+ * across every layer would stop the pointer the moment a layer key was pressed.
+ */
+#define ABSOLUTE_TO_RELATIVE_RESYNC(n)                                                             \
+    {                                                                                              \
+        struct absolute_to_relative_data *data = DEVICE_DT_INST_GET(n)->data;                      \
+        k_spinlock_key_t key = k_spin_lock(&data->lock);                                           \
+        data->previous_x = COORD_UNINITIALIZED;                                                    \
+        data->previous_y = COORD_UNINITIALIZED;                                                    \
+        data->previous_dx = 0;                                                                     \
+        data->previous_dy = 0;                                                                     \
+        k_spin_unlock(&data->lock, key);                                                           \
+    }
+
+static int absolute_to_relative_layer_listener(const zmk_event_t *eh) {
+    ARG_UNUSED(eh);
+
+    DT_INST_FOREACH_STATUS_OKAY(ABSOLUTE_TO_RELATIVE_RESYNC)
+
+    return ZMK_EV_EVENT_BUBBLE;
+}
+
+ZMK_LISTENER(absolute_to_relative_layer, absolute_to_relative_layer_listener);
+ZMK_SUBSCRIPTION(absolute_to_relative_layer, zmk_layer_state_changed);
