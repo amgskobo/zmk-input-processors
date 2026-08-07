@@ -159,6 +159,9 @@ When implementing input processor drivers, always include these Zephyr headers:
 - **Type casting**: When converting between `uint16_t` and `int16_t` for delta calculations, explicitly cast both operands to `int16_t` before subtraction to avoid signed/unsigned conversion issues and potential wraparound problems.
 - **Independent axis tracking**: The absolute-to-relative processor tracks X and Y axes independently with separate touch states and timeout handlers. This design assumes single-touch input and may not be suitable for multi-touch scenarios.
 - **Early return on first touch**: When initializing smoothing state on first touch, use `return ZMK_INPUT_PROC_CONTINUE` to prevent the initial position from being output as a movement event. This provides clean startup without spurious inputs.
+- **The chain is chosen per event**: ZMK picks the processor chain from the layer active at the moment each event arrives, and by the first matching override in devicetree child order - not by the highest active layer. One contact can therefore be split across two chains, with its `BTN_TOUCH` release routed somewhere else entirely.
+- **Drop per-contact state on a layer change**: any processor that remembers something about the contact in progress - a reference point, an origin, a held cell - must subscribe to `zmk_layer_state_changed` and drop it. Otherwise the instance a contact moves to measures the first sample it sees against an earlier, unrelated contact.
+- **Keep suppression paired**: never drop a button release unless the matching press was dropped by this same instance. Passing a release through is always safe, because the press it belongs to already reached the host; dropping one leaves the button held down with nothing left to release it. The record of outstanding presses is per instance and must also be cleared on a layer change.
 
 ## Key Files & Examples
 
