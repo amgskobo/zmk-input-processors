@@ -154,13 +154,15 @@ static int handle_button_suppress(struct input_event *event, struct absolute_to_
         return ZMK_INPUT_PROC_CONTINUE;
     }
 
-    if (event->value) {
-        data->btn0_press_suppressed = true;
-    } else if (!data->btn0_press_suppressed) {
+    k_spinlock_key_t key = k_spin_lock(&data->lock);
+    bool was_suppressed = data->btn0_press_suppressed;
+
+    data->btn0_press_suppressed = event->value != 0;
+    k_spin_unlock(&data->lock, key);
+
+    if (!event->value && !was_suppressed) {
         LOG_WRN("Passing BTN_0 release: its press was not suppressed here");
         return ZMK_INPUT_PROC_CONTINUE;
-    } else {
-        data->btn0_press_suppressed = false;
     }
 
     if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
@@ -286,6 +288,14 @@ DT_INST_FOREACH_STATUS_OKAY(ABSOLUTE_TO_RELATIVE_INST)
         data->previous_y = COORD_UNINITIALIZED;                                                    \
         data->previous_dx = 0;                                                                     \
         data->previous_dy = 0;                                                                     \
+        /*                                                                                         \
+         * A press suppressed here whose release is routed elsewhere would                         \
+         * leave this set for good, and the next unrelated release to reach                        \
+         * this instance would be swallowed - the stuck button the record                          \
+         * exists to prevent. A layer change is the moment that split becomes                      \
+         * possible, so clear it here rather than expiring it on a timer.                          \
+         */                                                                                        \
+        data->btn0_press_suppressed = false;                                                       \
         k_spin_unlock(&data->lock, key);                                                           \
     }
 
