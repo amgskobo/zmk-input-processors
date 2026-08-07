@@ -71,6 +71,21 @@ Then wire it into your input handler chain according to your ZMK configuration.
 
 **Smoothing Behavior**: Movement data is smoothed by averaging the current delta with the previous delta using: `smooth_delta = (current_delta + previous_delta) >> 1`. First touch initializes state with zero delta and doesn't output an event; smoothing begins on the second movement event.
 
+### Configuration Reference
+
+| Property | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `suppress-btn-touch` | bool | false | Consume `INPUT_BTN_TOUCH` after using it to track contact state, so it does not reach the mouse HID as a button press. |
+| `suppress-btn0` | bool | false | Consume `INPUT_BTN_0` when the trackpad reports a physical click. |
+
+### Layer Changes
+
+Which processors run is decided per event, from the layer active at that moment, so one contact can be split across two chains. The instance a contact moves to would otherwise still hold a reference point taken from an earlier touch, and turn its first sample into the distance between two unrelated contacts - a jump across the pad produced by a single count of real motion.
+
+`zmk_layer_state_changed` is therefore subscribed directly, and a layer change drops the reference point. The next sample re-establishes it, exactly as at touch-down.
+
+`suppress-btn0` never drops a `BTN_0` release whose press was not suppressed here. Passing a release through is always safe - the press it belongs to already reached the host - while dropping one would leave the button held down with nothing left to release it. That record is cleared on a layer change too.
+
 ## Project Structure
 
 ```
