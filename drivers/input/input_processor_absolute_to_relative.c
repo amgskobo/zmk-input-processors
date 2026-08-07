@@ -13,7 +13,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/spinlock.h>
 #include <zmk/event_manager.h>
 #include <zmk/events/layer_state_changed.h>
 
@@ -30,12 +29,13 @@ struct absolute_to_relative_config {
 
 struct absolute_to_relative_data {
     /*
-     * Guards the reference point below. It is read on the input thread and
-     * dropped from whichever thread raises a layer change, and a change landing
-     * between the two axes of one sample would convert one of them against the
-     * old reference - the very jump this reference is dropped to avoid.
+     * Written from the input thread and cleared from whichever thread raises a
+     * layer change. No lock: each field is a single aligned store, the clearing
+     * side only ever invalidates and the reading side only ever re-establishes,
+     * so a half-seen clear costs at most one more sample against the old
+     * reference. A lock would not buy the pair of axes either - they arrive as
+     * separate events, so a change can always land between them.
      */
-    struct k_spinlock lock;
     uint16_t previous_x, previous_y;
     int16_t previous_dx, previous_dy;
     bool touching;
@@ -116,9 +116,7 @@ static int handle_touch_button(struct input_event *event, struct absolute_to_rel
     if (event->value == 1) {
         /* Touch started */
         data->touching = true;
-        k_spinlock_key_t key = k_spin_lock(&data->lock);
         touch_init(data);
-        k_spin_unlock(&data->lock, key);
     } else {
         /* Touch ended */
         data->touching = false;
@@ -154,11 +152,9 @@ static int handle_button_suppress(struct input_event *event, struct absolute_to_
         return ZMK_INPUT_PROC_CONTINUE;
     }
 
-    k_spinlock_key_t key = k_spin_lock(&data->lock);
     bool was_suppressed = data->btn0_press_suppressed;
 
     data->btn0_press_suppressed = event->value != 0;
-    k_spin_unlock(&data->lock, key);
 
     if (!event->value && !was_suppressed) {
         LOG_WRN("Passing BTN_0 release: its press was not suppressed here");
@@ -200,13 +196,11 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
     /* Convert absolute axes to relative motion */
     bool suppress_event = false;
 
-    k_spinlock_key_t key = k_spin_lock(&data->lock);
     if (event->code == INPUT_ABS_X) {
         suppress_event = process_axis(event, &data->previous_x, &data->previous_dx, INPUT_REL_X);
     } else if (event->code == INPUT_ABS_Y) {
         suppress_event = process_axis(event, &data->previous_y, &data->previous_dy, INPUT_REL_Y);
     }
-    k_spin_unlock(&data->lock, key);
 
     if (suppress_event) {
         return ZMK_INPUT_PROC_STOP;
@@ -283,7 +277,6 @@ DT_INST_FOREACH_STATUS_OKAY(ABSOLUTE_TO_RELATIVE_INST)
 #define ABSOLUTE_TO_RELATIVE_RESYNC(n)                                                             \
     {                                                                                              \
         struct absolute_to_relative_data *data = DEVICE_DT_INST_GET(n)->data;                      \
-        k_spinlock_key_t key = k_spin_lock(&data->lock);                                           \
         data->previous_x = COORD_UNINITIALIZED;                                                    \
         data->previous_y = COORD_UNINITIALIZED;                                                    \
         data->previous_dx = 0;                                                                     \
@@ -296,7 +289,6 @@ DT_INST_FOREACH_STATUS_OKAY(ABSOLUTE_TO_RELATIVE_INST)
          * possible, so clear it here rather than expiring it on a timer.                          \
          */                                                                                        \
         data->btn0_press_suppressed = false;                                                       \
-        k_spin_unlock(&data->lock, key);                                                           \
     }
 
 static int absolute_to_relative_layer_listener(const zmk_event_t *eh) {
