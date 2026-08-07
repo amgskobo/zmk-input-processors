@@ -162,7 +162,7 @@ See [.github/copilot-instructions.md](.github/copilot-instructions.md) for detai
 ### Key Code Patterns
 
 - **Device tree config**: Use `DT_INST_PROP_OR(n, prop, default)` for device-tree-backed values
-- **Motion smoothing**: Store both previous position and previous delta; average current delta with previous delta using `(dx + prev_dx) >> 1`
+- **Motion smoothing**: Store both previous position and previous delta; average current delta with previous delta using `(dx + prev_dx) / 2`. Divide rather than shift - a shift rounds towards minus infinity and makes the same path measure longer one way than the other
 - **Delayed work**: Use Zephyr's `k_work_delayable` primitives (`k_work_init_delayable`, `k_work_reschedule`)
 - **Multi-instance callbacks**: Use `CONTAINER_OF()` to retrieve driver state from work struct (not `DEVICE_DT_INST_GET(0)`)
 - **Logging**: Use `LOG_MODULE_REGISTER(name, CONFIG_ZMK_LOG_LEVEL)` and `LOG_INF()` for debugging
