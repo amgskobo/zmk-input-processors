@@ -38,7 +38,6 @@ struct absolute_to_relative_data {
      */
     uint16_t previous_x, previous_y;
     int16_t previous_dx, previous_dy;
-    bool touching;
     /*
      * Set while a BTN_0 press has been suppressed here and its release has not
      * been seen yet. Suppression has to stay paired: which processors run is
@@ -52,16 +51,14 @@ struct absolute_to_relative_data {
 };
 
 /**
- * Initialize coordinates when touch starts
+ * Drop the reference point, so the next sample on each axis establishes a new
+ * one instead of being measured against a position that no longer relates to it.
  */
-static inline void touch_init(struct absolute_to_relative_data *data) {
+static inline void drop_reference(struct absolute_to_relative_data *data) {
     data->previous_x = COORD_UNINITIALIZED;
     data->previous_y = COORD_UNINITIALIZED;
     data->previous_dx = 0;
     data->previous_dy = 0;
-    if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
-        LOG_DBG("Touch started - coordinates initialized");
-    }
 }
 
 /**
@@ -88,9 +85,18 @@ static inline bool process_axis(struct input_event *event, uint16_t *previous_po
         return true; /* Signal to suppress this event */
     }
 
-    /* Calculate delta and apply smoothing (use local prev to reduce memory access) */
+    /*
+     * Calculate delta and apply smoothing (use local prev to reduce memory
+     * access).
+     *
+     * Halved by dividing rather than shifting. A shift rounds towards minus
+     * infinity, so an odd sum loses its half going one way and gains it going
+     * the other, and the same path travelled in opposite directions does not
+     * come back to where it started. Division truncates towards zero, which
+     * treats both directions alike.
+     */
     int16_t delta = (int16_t)value - (int16_t)prev;
-    int16_t smooth_delta = (delta + *previous_delta) >> 1;
+    int16_t smooth_delta = (delta + *previous_delta) / 2;
 
     if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
         LOG_DBG("%s: %u -> rel_%s: %d (raw_delta: %d, smoothed: %d)",
@@ -110,19 +116,24 @@ static inline bool process_axis(struct input_event *event, uint16_t *previous_po
 
 /**
  * Handle touch button events (BTN_TOUCH)
+ *
+ * Both edges drop the reference point. A press begins a contact that bears no
+ * relation to the last one, and a release ends one - and the driver emits a
+ * final absolute pair just after the release, which would otherwise be turned
+ * into motion against a position that has stopped meaning anything.
+ *
+ * The press is never treated as redundant, even when a contact already looks
+ * active. Which processors run is decided per event from the layer active at
+ * that moment, so this instance may simply have missed the release that ended
+ * the previous contact; skipping the reset in that case would measure the new
+ * contact against the old one's position.
  */
 static int handle_touch_button(struct input_event *event, struct absolute_to_relative_data *data,
                                const struct absolute_to_relative_config *config) {
-    if (event->value == 1) {
-        /* Touch started */
-        data->touching = true;
-        touch_init(data);
-    } else {
-        /* Touch ended */
-        data->touching = false;
-        if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
-            LOG_DBG("Touch released");
-        }
+    drop_reference(data);
+
+    if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
+        LOG_DBG("Touch %s - reference dropped", event->value ? "started" : "released");
     }
 
     if (config->suppress_btn_touch) {
@@ -188,12 +199,26 @@ static int absolute_to_relative_handle_event(const struct device *dev, struct in
         }
     }
 
-    /* Only process absolute axis events when touching */
-    if (!data->touching || event->type != INPUT_EV_ABS) {
+    if (event->type != INPUT_EV_ABS) {
         return ZMK_INPUT_PROC_CONTINUE;
     }
 
-    /* Convert absolute axes to relative motion */
+    /*
+     * Convert absolute axes to relative motion.
+     *
+     * There is deliberately no contact-state gate here. Contact state would be
+     * per instance, but an instance only sees the events that arrive while it
+     * holds the chain, and the chain is chosen per event from the layer active
+     * at that moment. An instance that missed the press of the contact now in
+     * progress would gate itself off for the rest of it and pass absolute
+     * events through unconverted - which reads as the pointer dying mid-stroke
+     * until the finger is lifted, and only intermittently, since an instance
+     * that once saw a press without its release stays open by accident.
+     *
+     * The reference point already covers not knowing where the finger was: the
+     * first sample on an axis establishes it and is suppressed, and the next
+     * one converts. That is the same sample every contact spends at its start.
+     */
     bool suppress_event = false;
 
     if (event->code == INPUT_ABS_X) {
@@ -217,8 +242,8 @@ static int absolute_to_relative_init(const struct device *dev) {
     const struct absolute_to_relative_config *config = dev->config;
 
     data->dev = dev;
-    data->touching = false;
     data->btn0_press_suppressed = false;
+    drop_reference(data);
 
     LOG_INF("Initialized (suppress_btn_touch=%d, suppress_btn0=%d)",
             config->suppress_btn_touch, config->suppress_btn0);
@@ -238,7 +263,6 @@ static const struct zmk_input_processor_driver_api absolute_to_relative_driver_a
  */
 #define ABSOLUTE_TO_RELATIVE_INST(n)                                                   \
     static struct absolute_to_relative_data processor_absolute_to_relative_data_##n = {\
-        .touching = false,                                                              \
         .previous_x = COORD_UNINITIALIZED,                                              \
         .previous_y = COORD_UNINITIALIZED,                                              \
         .previous_dx = 0,                                                               \
