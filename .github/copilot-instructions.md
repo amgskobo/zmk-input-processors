@@ -42,21 +42,21 @@ When implementing input processor drivers, always include these Zephyr headers:
 
 - **Smoothing pattern** (if needed for motion data):
   ```c
-  if (!data->touching) {
-      // First touch: initialize state, don't output event
-      data->touching = true;
+  if (data->previous_pos == POS_UNINITIALIZED) {
+      // No reference yet: establish one and produce no event
       data->previous_pos = value;
       data->previous_delta = 0;
-      return ZMK_INPUT_PROC_CONTINUE;
+      return ZMK_INPUT_PROC_STOP;
   }
-  // Subsequent touches: apply smoothing
   int16_t delta = (int16_t)value - (int16_t)data->previous_pos;
-  int16_t smooth_delta = (delta + data->previous_delta) >> 1;
+  int16_t smooth_delta = (delta + data->previous_delta) / 2;
   event->value = smooth_delta;
   data->previous_delta = delta;
   data->previous_pos = value;
   ```
-  Use `>> 1` (bit shift) for division by 2 for efficiency. Store both previous position and previous delta. Early return on first touch prevents spurious movement events.
+  Store both the previous position and the previous delta, and key the "no reference yet" case off the position rather than off a contact-active flag - an instance only sees the part of a contact during which it holds the chain, so a flag set from `BTN_TOUCH` would silence it for the whole of a contact that began on another layer.
+
+  Halve by dividing, not by shifting. A shift rounds towards minus infinity, so an odd sum loses its half going one way and gains it going the other, and the same path does not measure the same length in both directions.
 
 - **Delayed work** is done via Zephyr's `k_work_delayable` primitives:
   - `k_work_init_delayable()` in init function

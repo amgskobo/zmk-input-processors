@@ -69,7 +69,9 @@ Then wire it into your input handler chain according to your ZMK configuration.
 
 **Note**: The processor uses a fixed 70ms report timing. This value is hardcoded and not configurable via device tree. 
 
-**Smoothing Behavior**: Movement data is smoothed by averaging the current delta with the previous delta using: `smooth_delta = (current_delta + previous_delta) >> 1`. First touch initializes state with zero delta and doesn't output an event; smoothing begins on the second movement event.
+**Smoothing Behavior**: Movement data is smoothed by averaging the current delta with the previous delta: `smooth_delta = (current_delta + previous_delta) / 2`. The halving divides rather than shifting, because a shift rounds towards minus infinity and would make the same path measure longer travelled one way than the other. The first sample on each axis establishes the reference point and produces no event; smoothing begins on the second.
+
+**Reference point**: `BTN_TOUCH` drops the reference point on both edges, and so does a layer change. Absolute events are converted whenever they arrive, without checking whether a contact is believed to be active - an instance only sees the part of a contact during which it holds the chain, so believing otherwise would silence it for the rest of a contact that began elsewhere.
 
 ## Project Structure
 
