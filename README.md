@@ -4,7 +4,7 @@ A Zephyr module that provides input processors for ZMK (Zephyr Mechanical Keyboa
 
 ## Features
 
-- **Absolute to Relative Processor** — Converts absolute mouse coordinates to relative movements with smoothing and configurable report timing
+- **Absolute to Relative Processor** — Converts absolute pointer coordinates into relative motion, smoothed over two samples
 - Modular architecture for adding new input processors
 - Device tree configuration support
 - Conditional build system via Kconfig
@@ -67,8 +67,6 @@ In your keyboard's device tree file (`.keymap` or DTS), enable the processor:
 
 Then wire it into your input handler chain according to your ZMK configuration.
 
-**Note**: The processor uses a fixed 70ms report timing. This value is hardcoded and not configurable via device tree. 
-
 **Smoothing Behavior**: Movement data is smoothed by averaging the current delta with the previous delta: `smooth_delta = (current_delta + previous_delta) / 2`. The halving divides rather than shifting, because a shift rounds towards minus infinity and would make the same path measure longer travelled one way than the other. The first sample on each axis establishes the reference point and produces no event; smoothing begins on the second.
 
 **Reference point**: `BTN_TOUCH` drops the reference point on both edges, and so does a layer change. Absolute events are converted whenever they arrive, without checking whether a contact is believed to be active - an instance only sees the part of a contact during which it holds the chain, so believing otherwise would silence it for the rest of a contact that began elsewhere.
@@ -77,7 +75,7 @@ Then wire it into your input handler chain according to your ZMK configuration.
 
 | Property | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `suppress-btn-touch` | bool | false | Consume `INPUT_BTN_TOUCH` after using it to track contact state, so it does not reach the mouse HID as a button press. |
+| `suppress-btn-touch` | bool | false | Consume `INPUT_BTN_TOUCH` after using it to drop the reference point, so it does not reach the mouse HID as a button press. |
 | `suppress-btn0` | bool | false | Consume `INPUT_BTN_0` when the trackpad reports a physical click. |
 
 ### Layer Changes

@@ -47,7 +47,6 @@ struct absolute_to_relative_data {
      * held down on the host with nothing left to release it.
      */
     bool btn0_press_suppressed;
-    const struct device *dev;
 };
 
 /**
@@ -241,7 +240,6 @@ static int absolute_to_relative_init(const struct device *dev) {
     struct absolute_to_relative_data *data = (struct absolute_to_relative_data *)dev->data;
     const struct absolute_to_relative_config *config = dev->config;
 
-    data->dev = dev;
     data->btn0_press_suppressed = false;
     drop_reference(data);
 
@@ -294,17 +292,15 @@ DT_INST_FOREACH_STATUS_OKAY(ABSOLUTE_TO_RELATIVE_INST)
  * Dropping the reference costs the one sample spent re-establishing it, the
  * same sample every contact already spends when it starts.
  *
- * The touch flag is deliberately left alone. Clearing it would silence a
- * contact until the finger lifted, which on a board that keeps one instance
- * across every layer would stop the pointer the moment a layer key was pressed.
+ * Nothing here records whether a contact is in progress, deliberately. An
+ * instance only sees the events that arrive while it holds the chain, so a
+ * flag taken from BTN_TOUCH would be wrong for exactly the contact this reset
+ * exists to rescue.
  */
 #define ABSOLUTE_TO_RELATIVE_RESYNC(n)                                                             \
     {                                                                                              \
         struct absolute_to_relative_data *data = DEVICE_DT_INST_GET(n)->data;                      \
-        data->previous_x = COORD_UNINITIALIZED;                                                    \
-        data->previous_y = COORD_UNINITIALIZED;                                                    \
-        data->previous_dx = 0;                                                                     \
-        data->previous_dy = 0;                                                                     \
+        drop_reference(data);                                                                      \
         /*                                                                                         \
          * A press suppressed here whose release is routed elsewhere would                         \
          * leave this set for good, and the next unrelated release to reach                        \
