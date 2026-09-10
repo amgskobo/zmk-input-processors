@@ -370,14 +370,33 @@ when `CONFIG_ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS=y`. They appear under the
 custom settings list, with the declared type and range driving the widget, so
 this module ships no page and no protocol of its own.
 
-Keys are named `<processor>.<parameter>.<instance>`, for example
-`runtime_scaler.mul.pointer`. The last part is the node's `setting-name`, and
-falls back to its devicetree instance number when it has none. Naming it is
-worth the line: a board routes several instances of the same processor — a
-pointer speed, a scroll speed and an axis kill are all scalers — and in a
-client they are otherwise identically named rows told apart only by a number
-whose order comes from however devicetree happened to enumerate the nodes. The
-whole key is capped at 48 bytes.
+Keys are named `<what it is>.<which one>.<which field>`, so everything up to
+and including the instance identifies one node:
+
+```
+runtime_scaler.pointer.mul
+runtime_scaler.pointer.div
+runtime_scaler.scroll.mul
+runtime_scaler.scroll.div
+runtime_scaler.scroll_x.mul
+runtime_scaler.scroll_x.div
+```
+
+The instance part is the node's `setting-name`, falling back to its devicetree
+instance number when it has none. Naming it is worth the line: a board routes
+several instances of the same processor — a pointer speed, a scroll speed and
+an axis kill are all scalers — and in a client they are otherwise identically
+named rows told apart only by a number whose order comes from however
+devicetree happened to enumerate the nodes.
+
+The instance sits **before** the field rather than after it, which matters more
+than it looks. A client renders a flat sorted list; with the field first, the
+three scalers above interleave and each node's pair ends up three rows apart.
+This way they are contiguous, and a prefix match selects exactly one node —
+which is what a view drawing the chain needs in order to attach values to the
+stage they belong to.
+
+The whole key is capped at 48 bytes.
 
 The registry also owns persistence. The drivers store nothing themselves, which
 is what keeps a value from having two owners that can disagree after a reboot.

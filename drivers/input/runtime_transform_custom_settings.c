@@ -29,15 +29,10 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-/*
- * Keys are qualified by instance because a board routes more than one
- * transform -- a pointer and a scroll route, say -- and each keeps its own
- * orientation.
- */
 #define RUNTIME_TRANSFORM_SETTING(n, field, key)                                                   \
     ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
         runtime_transform_cs_##field##_##n, ZMK_INPUT_PROCESSORS_SUBSYSTEM,                        \
-        "runtime_transform." key "." ZMK_INPUT_PROCESSORS_SETTING_NAME(n),                         \
+        "runtime_transform." ZMK_INPUT_PROCESSORS_SETTING_NAME(n) "." key,                         \
         ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL,                                                        \
         ZMK_CUSTOM_SETTING_VALUE_BOOL(DT_INST_PROP(n, field)),                                     \
         ZMK_CUSTOM_SETTING_CONFIDENTIALITY_RPC_PUBLIC, ZMK_CUSTOM_SETTING_PERMISSION_UNSECURE,     \
