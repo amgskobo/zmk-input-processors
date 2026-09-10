@@ -22,11 +22,27 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include <zephyr/device.h>
 
 struct runtime_temp_layer_params {
+    /*
+     * Whether the layer is raised at all.
+     *
+     * Every other processor in this module has a no-op reachable from its own
+     * values -- a scaler passes through at mul == div, a transform with no
+     * flags set does nothing -- so a chain can be reshaped by editing numbers
+     * rather than by rebuilding it. This one has no such value: a timeout of
+     * zero means "never drop by timeout", not "never raise", and an idle guard
+     * long enough to suppress it would also be a guess. So the switch is
+     * explicit.
+     *
+     * Turning it off drops a layer this processor currently holds, rather than
+     * leaving it up until something else happens to drop it.
+     */
+    bool enabled;
     /*
      * The layer to raise, as a layer ID -- the same thing
      * zmk_keymap_layer_activate() takes, not a position in the keymap. The two
@@ -53,10 +69,14 @@ int runtime_temp_layer_get_params(const struct device *dev,
  * raising a layer that does not exist.
  *
  * A layer already raised stays raised on its old number until it drops
- * normally; the new one takes effect at the next activation. Moving a live
- * layer would mean deactivating one and activating another from whichever
+ * normally; a new layer number takes effect at the next activation. Moving a
+ * live layer would mean deactivating one and activating another from whichever
  * thread happened to write the setting, which is a worse failure than one
  * stale activation.
+ *
+ * Switching enabled off is the exception, and drops a held layer instead of
+ * waiting: a layer left up by a processor that has been turned off has nothing
+ * left that is responsible for lowering it.
  *
  * Nothing is persisted here; that is the settings layer's job, which is what
  * keeps this driver free of a second owner for the same value.

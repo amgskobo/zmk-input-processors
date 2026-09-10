@@ -45,3 +45,12 @@ properties:
       anything else the pointer hand reaches for while the layer is up. Every
       other press drops it immediately. With no list at all, no key press drops
       the layer and only the timeout does.
+  start-disabled:
+    type: boolean
+    description: >-
+      Start with the processor switched off, so it raises nothing. This is the
+      stage's no-op: every other processor here passes through at some value of
+      its own, but a timeout of zero means "never drop by timeout" rather than
+      "never raise", so the switch has to be explicit. A Zephyr boolean is
+      presence-based and so cannot default to true, which is why the devicetree
+      property is the negative one while the setting a client sees is "enabled".

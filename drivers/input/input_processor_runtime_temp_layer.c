@@ -156,10 +156,24 @@ int runtime_temp_layer_set_params(const struct device *dev,
 
     data->params = *params;
 
+    /*
+     * A layer this processor is holding has nothing else responsible for
+     * lowering it once the processor is switched off, so drop it here rather
+     * than leaving it up until a stray key press happens to. It goes through
+     * the same work item as every other drop, which keeps layer changes off
+     * whichever thread wrote the setting.
+     */
+    const bool release_held_layer = !params->enabled && data->is_active;
+
     k_mutex_unlock(&data->lock);
 
-    LOG_DBG("%s: layer %d, timeout %u ms, prior idle %u ms", dev->name, params->layer,
-            params->timeout_ms, params->require_prior_idle_ms);
+    if (release_held_layer) {
+        k_work_reschedule(&data->deactivate_work, K_NO_WAIT);
+    }
+
+    LOG_DBG("%s: %s, layer %d, timeout %u ms, prior idle %u ms", dev->name,
+            params->enabled ? "on" : "off", params->layer, params->timeout_ms,
+            params->require_prior_idle_ms);
 
     return 0;
 }
@@ -305,6 +319,15 @@ static int runtime_temp_layer_handle_event(const struct device *dev, struct inpu
     }
 
     const struct runtime_temp_layer_params params = data->params;
+
+    /* Switched off, this stage is a no-op: it raises nothing and, because it
+     * reschedules nothing either, holds no timer that could fire later. */
+    if (!params.enabled) {
+        k_mutex_unlock(&data->lock);
+
+        return ZMK_INPUT_PROC_CONTINUE;
+    }
+
     const int64_t now = k_uptime_get();
     const bool typing = params.require_prior_idle_ms > 0 &&
                         (data->last_tapped + params.require_prior_idle_ms) > now;
@@ -350,6 +373,7 @@ static const struct zmk_input_processor_driver_api runtime_temp_layer_driver_api
     static struct runtime_temp_layer_data runtime_temp_layer_data_##n = {                          \
         .params =                                                                                  \
             {                                                                                      \
+                .enabled = !DT_INST_PROP(n, start_disabled),                                       \
                 .layer = DT_INST_PROP(n, layer),                                                   \
                 .timeout_ms = DT_INST_PROP(n, timeout_ms),                                         \
                 .require_prior_idle_ms = DT_INST_PROP_OR(n, require_prior_idle_ms, 0),             \

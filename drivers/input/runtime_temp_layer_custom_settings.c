@@ -55,7 +55,27 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
  * the keymap regardless, because a constraint is a drawing hint that reaches
  * the client, not a rule the firmware is entitled to assume was obeyed.
  */
+/*
+ * The switch that gives this stage a no-op.
+ *
+ * Every other processor here can be made to pass through by editing its own
+ * values -- a scaler at mul == div, a transform with no flags set -- so a
+ * chain is reshaped by changing numbers rather than by rebuilding it. This one
+ * has no such value, because a timeout of zero means "never drop by timeout"
+ * rather than "never raise". The devicetree property is the negative one
+ * because a Zephyr boolean is presence-based and so cannot default to true;
+ * the setting a client sees is the plain positive one.
+ */
+#define RUNTIME_TEMP_LAYER_ENABLED(n)                                                              \
+    ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
+        runtime_temp_layer_cs_enabled_##n, ZMK_INPUT_PROCESSORS_SUBSYSTEM,                         \
+        ZMK_INPUT_PROCESSORS_SETTING_KEY(n, "enabled"), ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL,        \
+        ZMK_CUSTOM_SETTING_VALUE_BOOL(!DT_INST_PROP(n, start_disabled)),                           \
+        ZMK_CUSTOM_SETTING_CONFIDENTIALITY_RPC_PUBLIC, ZMK_CUSTOM_SETTING_PERMISSION_UNSECURE,     \
+        ZMK_CUSTOM_SETTING_PERMISSION_SECURE, ZMK_CUSTOM_SETTING_NO_CONSTRAINT);
+
 #define RUNTIME_TEMP_LAYER_SETTINGS(n)                                                             \
+    RUNTIME_TEMP_LAYER_ENABLED(n)                                                                  \
     RUNTIME_TEMP_LAYER_SETTING(n, layer, "layer", ZMK_CUSTOM_SETTING_LAYER_ID,                     \
                                ZMK_CUSTOM_SETTING_RANGE_INT32(0, ZMK_KEYMAP_LAYERS_LEN - 1))       \
     RUNTIME_TEMP_LAYER_SETTING(n, timeout_ms, "timeout_ms",                                        \
@@ -64,6 +84,19 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
                                ZMK_CUSTOM_SETTING_RANGE_INT32(0, RUNTIME_TEMP_LAYER_MAX_MS))
 
 DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TEMP_LAYER_SETTINGS)
+
+static bool read_bool(const struct zmk_custom_setting *setting, bool *out) {
+    struct zmk_custom_setting_value value;
+
+    if (zmk_custom_setting_read(setting, &value) != 0 ||
+        value.type != ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL) {
+        return false;
+    }
+
+    *out = value.bool_value;
+
+    return true;
+}
 
 static bool read_int32(const struct zmk_custom_setting *setting, uint32_t *out) {
     struct zmk_custom_setting_value value;
@@ -88,7 +121,8 @@ static bool read_int32(const struct zmk_custom_setting *setting, uint32_t *out) 
         uint32_t layer;                                                                            \
         uint32_t prior_idle;                                                                       \
                                                                                                    \
-        if (read_int32(&runtime_temp_layer_cs_layer_##n, &layer) &&                                \
+        if (read_bool(&runtime_temp_layer_cs_enabled_##n, &params.enabled) &&                      \
+            read_int32(&runtime_temp_layer_cs_layer_##n, &layer) &&                                \
             read_int32(&runtime_temp_layer_cs_timeout_ms_##n, &params.timeout_ms) &&               \
             read_int32(&runtime_temp_layer_cs_require_prior_idle_ms_##n, &prior_idle)) {           \
             params.layer = (uint8_t)layer;                                                         \

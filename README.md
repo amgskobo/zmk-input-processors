@@ -334,6 +334,24 @@ runtime_mouse_layer: runtime_mouse_layer {
 | `timeout-ms` | int | *required* | Pointer silence before the layer drops. 0 = never. |
 | `require-prior-idle-ms` | int | 0 | Window after a key press in which the layer will not come up. |
 | `excluded-positions` | array | *none* | Positions that do not drop the layer. |
+| `start-disabled` | bool | false | Start switched off, raising nothing. |
+
+`layer` is published with the `LAYER_ID` constraint, so a client draws the
+keymap's own layer list and the row reads "MOUSE (3)" rather than "3" — a
+layer is the one value here that cannot be sanity-checked by looking at it. The
+range is declared alongside it as a fallback for a client that does not
+understand the constraint, and neither is trusted: the driver rejects a layer
+outside the keymap regardless, because a constraint is a drawing hint that
+reaches the client and not a rule the firmware may assume was obeyed.
+
+`start-disabled` exists because this stage has no other no-op. Every other
+processor here can be made to pass through by editing its own values — a
+scaler at `multiplier == divisor`, a transform with no flags set — which is
+what lets a chain be reshaped by changing numbers instead of rebuilding it. A
+timeout of zero does not do that: it means "never drop by timeout", not "never
+raise". So the switch is explicit, and switching it off drops a layer this
+processor is currently holding rather than leaving it up with nothing left
+responsible for lowering it.
 
 `excluded-positions` stays structural. A list of key positions is not something
 a generic settings list can draw, and it belongs to the physical layout rather
