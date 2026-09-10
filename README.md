@@ -150,6 +150,49 @@ that want different values declare two nodes, which costs a few lines of
 devicetree and gives each one a key of its own. Two slots that want the *same*
 value are now guaranteed to keep it, where two chain cells could drift apart.
 
+### Every stage has a no-op, and that is the point
+
+Each processor here can be made to pass everything through by editing its own
+values:
+
+| Processor | Passes through when |
+| :--- | :--- |
+| `runtime-scaler` | `multiplier == divisor` (and kills the axis at `multiplier == 0`) |
+| `runtime-transform` | no flag set |
+| `runtime-code-mapper` | `enabled` false |
+| `runtime-temp-layer` | `enabled` false |
+
+This is what makes a chain editable without rebuilding it. Devicetree creates
+the devices and storage can only refer to ones that already exist, so a stage
+that is not in the chain cannot be switched on later — but a stage that *is*
+in the chain, sitting at a pass-through value, costs almost nothing and can be
+switched on at any time. Placing the stages you might want in advance, as
+no-ops, buys most of what a runtime-reorderable chain would.
+
+It buys reordering too, in the form that matters. Put the same kind of stage at
+two positions and move the value between them:
+
+```dts
+input-processors = <&zip_absolute_to_relative>,
+                   <&pointer_scaler_pre>,   /* 1/1 — before the curve */
+                   <&vector_accel>,
+                   <&pointer_scaler>;       /* 889/500 — after it */
+```
+
+"Scale before the curve instead of after it" is then two edits rather than a
+firmware change. Arbitrary permutations would need one placement per position,
+which is not practical, but the two or three orderings anyone actually wants
+are.
+
+The cost is genuinely small. A transform with no flags set never walks its code
+list — the invert tests short-circuit on the flags — and a scaler at 1/1
+leaves its remainder at zero, which the host tests pin because every chain
+holding a placed stage depends on it.
+
+What pre-placement cannot buy is a stage that does not exist. A rotation by an
+arbitrary angle, or an absolute-position mode, needs a processor written first;
+placing it is what makes its knobs settings afterwards.
+
 ### Multiple instances
 
 Every processor here keeps its state in its own `data` struct, and the
@@ -230,6 +273,14 @@ Both bounds are correctness limits rather than chosen ones: ZMK keeps a tracked
 remainder in an `int16_t` slot, and holding the two numbers inside the positive
 `int16` range is what guarantees the remainder fits it. A value outside the
 range fails the build through a `BUILD_ASSERT`, and is refused at runtime.
+
+A remainder left behind by a *different* ratio is discarded rather than carried
+in. The remainder lives in the listener's slot, not in the processor, so it
+survives a ratio change that the processor knows nothing about — and it is a
+fraction of one count in the ratio that produced it, meaning nothing in the new
+one. Carried in, going from 889/500 to 1/16 would spend up to 31 counts of
+movement nobody asked for on the first report after the edit: a visible jump,
+where the remainder exists to smooth a rounding difference.
 
 ### Enable the Runtime Transform
 

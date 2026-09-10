@@ -68,6 +68,47 @@ static void test_remainder_stays_in_range(void) {
     }
 }
 
+/*
+ * The ratio can change while the keyboard is running, and the remainder lives
+ * in the listener's slot rather than in the processor, so a value left by the
+ * old ratio is still there when the new one runs. Carried in, 400/16 would be
+ * 25 counts of movement nobody asked for on the very first report after the
+ * edit.
+ */
+static void test_stale_remainder_is_discarded(void) {
+    int16_t remainder = 400; /* plausible under a divisor of 500 */
+
+    assert(runtime_scaler_scale(7, 16, 16, &remainder) == 7);
+    assert(remainder == 0);
+
+    remainder = -400;
+    assert(runtime_scaler_scale(-7, 16, 16, &remainder) == -7);
+    assert(remainder == 0);
+
+    /* A remainder the current divisor could have produced is still carried. */
+    remainder = 15;
+    assert(runtime_scaler_scale(1, 1, 16, &remainder) == 1);
+    assert(remainder == 0);
+}
+
+/*
+ * A scaler at multiplier == divisor is the no-op every chain here relies on:
+ * stages are placed in advance at pass-through values so they can be reached
+ * from a client later. If this drifts, so does every chain holding one.
+ */
+static void test_equal_ratio_is_a_noop(void) {
+    const uint32_t ratios[] = {1, 2, 16, 500, 32767};
+
+    for (size_t r = 0; r < sizeof(ratios) / sizeof(ratios[0]); r++) {
+        int16_t remainder = 0;
+
+        for (int32_t v = -5000; v <= 5000; v += 7) {
+            assert(runtime_scaler_scale(v, ratios[r], ratios[r], &remainder) == v);
+            assert(remainder == 0);
+        }
+    }
+}
+
 /* Zero is how a chain kills one axis. */
 static void test_zero_multiplier(void) {
     int16_t remainder = 0;
@@ -104,6 +145,8 @@ int main(void) {
     test_sign_symmetry();
     test_remainder_accumulates();
     test_remainder_stays_in_range();
+    test_stale_remainder_is_discarded();
+    test_equal_ratio_is_a_noop();
     test_zero_multiplier();
     test_identity();
     test_saturates();

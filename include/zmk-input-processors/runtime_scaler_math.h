@@ -59,10 +59,26 @@ static inline bool runtime_scaler_params_valid(uint32_t multiplier, uint32_t div
  * would reverse it, which is the failure this function exists to avoid.
  */
 static inline int32_t runtime_scaler_scale(int32_t value, uint32_t multiplier, uint32_t divisor,
-                                        int16_t *remainder) {
+                                           int16_t *remainder) {
     int64_t numerator = (int64_t)value * (int64_t)multiplier;
 
     if (remainder != NULL) {
+        /*
+         * A remainder left by a different divisor is discarded rather than
+         * carried in. It is a fraction of one count in the ratio that produced
+         * it and means nothing in this one, and carrying it across a change
+         * costs up to old_divisor / new_divisor counts of movement nobody
+         * asked for -- 31 of them going from 889/500 to 1/16, which is a
+         * visible jump on the first report after the edit rather than the
+         * rounding difference the remainder exists to smooth.
+         *
+         * The ratio only changes when a client writes one, so this is a
+         * comparison on a path that is otherwise free.
+         */
+        if (*remainder >= (int32_t)divisor || *remainder <= -(int32_t)divisor) {
+            *remainder = 0;
+        }
+
         numerator += *remainder;
     }
 
