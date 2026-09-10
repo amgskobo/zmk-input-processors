@@ -10,12 +10,30 @@ config ZMK_INPUT_PROCESSOR_ABSOLUTE_TO_RELATIVE
         depends on (!ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL)
 
 
+# The runtime processors. Each one keeps the parameters its upstream
+# counterpart holds in rodata in RAM instead, and names them on the node, so
+# they can be listed and changed while the keyboard runs. Selected by the
+# devicetree, so a board that declares no such node compiles none of them.
 
-DT_COMPAT_ZMK_INPUT_PROCESSOR_SAFE_SCALER := zmk,input-processor-safe-scaler
+DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_SCALER := zmk,input-processor-runtime-scaler
 
-config ZMK_INPUT_PROCESSOR_SAFE_SCALER
+config ZMK_INPUT_PROCESSOR_RUNTIME_SCALER
 		bool
-		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_SAFE_SCALER))
+		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_SCALER))
+		depends on ZMK_POINTING
+
+DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TRANSFORM := zmk,input-processor-runtime-transform
+
+config ZMK_INPUT_PROCESSOR_RUNTIME_TRANSFORM
+		bool
+		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TRANSFORM))
+		depends on ZMK_POINTING
+
+DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_CODE_MAPPER := zmk,input-processor-runtime-code-mapper
+
+config ZMK_INPUT_PROCESSOR_RUNTIME_CODE_MAPPER
+		bool
+		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_CODE_MAPPER))
 		depends on ZMK_POINTING
 
 config ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS

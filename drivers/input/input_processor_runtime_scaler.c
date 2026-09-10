@@ -6,7 +6,7 @@
  *
  * Two differences from the stock processor, and nothing else:
  *
- * 1. The arithmetic is done in int64_t, and lives in safe_scaler_math.h so a
+ * 1. The arithmetic is done in int64_t, and lives in runtime_scaler_math.h so a
  *    host test can pin it. The stock scaler holds `event->value * multiplier`
  *    in an int16_t, so a multiplier of 889 turns any delta of 37 or more
  *    negative before it is divided -- the pointer reverses exactly when it is
@@ -19,7 +19,7 @@
  *    match the code, scale, keep the remainder.
  */
 
-#define DT_DRV_COMPAT zmk_input_processor_safe_scaler
+#define DT_DRV_COMPAT zmk_input_processor_runtime_scaler
 
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
@@ -27,11 +27,11 @@
 
 #include <drivers/input_processor.h>
 
-#include <zmk-input-processors/safe_scaler.h>
+#include <zmk-input-processors/runtime_scaler.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-struct safe_scaler_config {
+struct runtime_scaler_config {
     uint8_t type;
     size_t codes_len;
     const uint16_t *codes;
@@ -39,17 +39,17 @@ struct safe_scaler_config {
     uint32_t divisor;
 };
 
-struct safe_scaler_data {
+struct runtime_scaler_data {
     uint32_t multiplier;
     uint32_t divisor;
 };
 
-int safe_scaler_get_params(const struct device *dev, uint32_t *multiplier, uint32_t *divisor) {
+int runtime_scaler_get_params(const struct device *dev, uint32_t *multiplier, uint32_t *divisor) {
     if (dev == NULL || multiplier == NULL || divisor == NULL) {
         return -EINVAL;
     }
 
-    const struct safe_scaler_data *data = dev->data;
+    const struct runtime_scaler_data *data = dev->data;
 
     *multiplier = data->multiplier;
     *divisor = data->divisor;
@@ -57,17 +57,17 @@ int safe_scaler_get_params(const struct device *dev, uint32_t *multiplier, uint3
     return 0;
 }
 
-int safe_scaler_set_params(const struct device *dev, uint32_t multiplier, uint32_t divisor) {
+int runtime_scaler_set_params(const struct device *dev, uint32_t multiplier, uint32_t divisor) {
     if (dev == NULL) {
         return -EINVAL;
     }
 
-    if (!safe_scaler_params_valid(multiplier, divisor)) {
+    if (!runtime_scaler_params_valid(multiplier, divisor)) {
         LOG_WRN("%s: rejected ratio %u/%u", dev->name, multiplier, divisor);
         return -EINVAL;
     }
 
-    struct safe_scaler_data *data = dev->data;
+    struct runtime_scaler_data *data = dev->data;
 
     /*
      * Both numbers move together. A reader between two separate stores would
@@ -90,7 +90,7 @@ static int scale_value(struct input_event *event, uint32_t multiplier, uint32_t 
                        struct zmk_input_processor_state *state) {
     const int32_t original = event->value;
 
-    event->value = safe_scaler_scale(original, multiplier, divisor,
+    event->value = runtime_scaler_scale(original, multiplier, divisor,
                                      state != NULL ? state->remainder : NULL);
 
     LOG_DBG("scaled %d by %u/%u to %d", original, multiplier, divisor, event->value);
@@ -98,15 +98,15 @@ static int scale_value(struct input_event *event, uint32_t multiplier, uint32_t 
     return ZMK_INPUT_PROC_CONTINUE;
 }
 
-static int safe_scaler_handle_event(const struct device *dev, struct input_event *event,
+static int runtime_scaler_handle_event(const struct device *dev, struct input_event *event,
                                     uint32_t param1, uint32_t param2,
                                     struct zmk_input_processor_state *state) {
     /* The ratio is on the node; the chain declares zero cells. */
     ARG_UNUSED(param1);
     ARG_UNUSED(param2);
 
-    const struct safe_scaler_config *config = dev->config;
-    struct safe_scaler_data *data = dev->data;
+    const struct runtime_scaler_config *config = dev->config;
+    struct runtime_scaler_data *data = dev->data;
 
     if (event->type != config->type) {
         return ZMK_INPUT_PROC_CONTINUE;
@@ -126,9 +126,9 @@ static int safe_scaler_handle_event(const struct device *dev, struct input_event
     return ZMK_INPUT_PROC_CONTINUE;
 }
 
-static int safe_scaler_init(const struct device *dev) {
-    const struct safe_scaler_config *config = dev->config;
-    struct safe_scaler_data *data = dev->data;
+static int runtime_scaler_init(const struct device *dev) {
+    const struct runtime_scaler_config *config = dev->config;
+    struct runtime_scaler_data *data = dev->data;
 
     data->multiplier = config->multiplier;
     data->divisor = config->divisor;
@@ -136,25 +136,25 @@ static int safe_scaler_init(const struct device *dev) {
     return 0;
 }
 
-static const struct zmk_input_processor_driver_api safe_scaler_driver_api = {
-    .handle_event = safe_scaler_handle_event,
+static const struct zmk_input_processor_driver_api runtime_scaler_driver_api = {
+    .handle_event = runtime_scaler_handle_event,
 };
 
-#define SAFE_SCALER_INST(n)                                                                        \
-    BUILD_ASSERT(SAFE_SCALER_DT_PARAMS_VALID(DT_INST_PROP(n, multiplier),                          \
-                                            DT_INST_PROP(n, divisor)),                             \
+#define RUNTIME_SCALER_INST(n)                                                                     \
+    BUILD_ASSERT(RUNTIME_SCALER_DT_PARAMS_VALID(DT_INST_PROP(n, multiplier),                       \
+                                                DT_INST_PROP(n, divisor)),                         \
                  "multiplier must be 0-32767 and divisor 1-32767");                                \
-    static const uint16_t safe_scaler_codes_##n[] = DT_INST_PROP(n, codes);                        \
-    static const struct safe_scaler_config safe_scaler_config_##n = {                              \
+    static const uint16_t runtime_scaler_codes_##n[] = DT_INST_PROP(n, codes);                     \
+    static const struct runtime_scaler_config runtime_scaler_config_##n = {                        \
         .type = DT_INST_PROP_OR(n, type, INPUT_EV_REL),                                            \
         .codes_len = DT_INST_PROP_LEN(n, codes),                                                   \
-        .codes = safe_scaler_codes_##n,                                                            \
+        .codes = runtime_scaler_codes_##n,                                                         \
         .multiplier = DT_INST_PROP(n, multiplier),                                                 \
         .divisor = DT_INST_PROP(n, divisor),                                                       \
     };                                                                                             \
-    static struct safe_scaler_data safe_scaler_data_##n;                                           \
-    DEVICE_DT_INST_DEFINE(n, &safe_scaler_init, NULL, &safe_scaler_data_##n,                       \
-                          &safe_scaler_config_##n, POST_KERNEL,                                    \
-                          CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &safe_scaler_driver_api);
+    static struct runtime_scaler_data runtime_scaler_data_##n;                                     \
+    DEVICE_DT_INST_DEFINE(n, &runtime_scaler_init, NULL, &runtime_scaler_data_##n,                 \
+                          &runtime_scaler_config_##n, POST_KERNEL,                                 \
+                          CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &runtime_scaler_driver_api);
 
-DT_INST_FOREACH_STATUS_OKAY(SAFE_SCALER_INST)
+DT_INST_FOREACH_STATUS_OKAY(RUNTIME_SCALER_INST)

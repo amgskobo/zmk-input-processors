@@ -15,14 +15,14 @@
 
 #include <zephyr/device.h>
 
-#include <zmk-input-processors/safe_scaler_math.h>
+#include <zmk-input-processors/runtime_scaler_math.h>
 
 /* Reads the ratio the processor is applying right now. */
-int safe_scaler_get_params(const struct device *dev, uint32_t *multiplier, uint32_t *divisor);
+int runtime_scaler_get_params(const struct device *dev, uint32_t *multiplier, uint32_t *divisor);
 
 /*
  * Applies a new ratio. Returns -EINVAL and changes nothing when either number
- * is outside the range safe_scaler_params_valid() accepts, so a bad value from
+ * is outside the range runtime_scaler_params_valid() accepts, so a bad value from
  * a client cannot take a processor out of service.
  *
  * Nothing is persisted here. A processor holds the value it was last given
@@ -30,4 +30,4 @@ int safe_scaler_get_params(const struct device *dev, uint32_t *multiplier, uint3
  * settings layer's job, which is what keeps this driver free of a second
  * owner for the same number.
  */
-int safe_scaler_set_params(const struct device *dev, uint32_t multiplier, uint32_t divisor);
+int runtime_scaler_set_params(const struct device *dev, uint32_t multiplier, uint32_t divisor);

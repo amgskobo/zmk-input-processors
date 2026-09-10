@@ -1,0 +1,45 @@
+# Copyright (c) 2026 amgskobo
+# SPDX-License-Identifier: MIT
+
+description: |
+  Rewrites event codes from a from/to table, with a switch held on the node.
+
+  Unlike zmk,input-processor-code-mapper the map can be turned off while the
+  keyboard runs. That is the one question a mapper has worth asking at runtime,
+  and it is what turns a scroll route back into a pointer route without a layer
+  or a rebuild. Disabled, the processor is a no-op rather than absent, so the
+  chain keeps its shape and the stage can be switched back on.
+
+compatible: "zmk,input-processor-runtime-code-mapper"
+
+include: ip_zero_param.yaml
+
+properties:
+  type:
+    type: int
+    default: 2
+    description: >-
+      Event type to act on, from dt-bindings/zmk/input_transform.h. The default
+      is INPUT_EV_REL (2).
+  map:
+    type: array
+    required: true
+    description: >-
+      From/to code pairs, flattened: an even number of entries, each odd entry
+      the code to match and the following one the code it becomes. The first
+      match wins and no further pair is considered, so a chain of rewrites is
+      not possible in one instance.
+  start-disabled:
+    type: boolean
+    description: >-
+      Start with the map switched off. A Zephyr boolean is presence-based and
+      so cannot default to true, which is why the devicetree property is the
+      negative one while the setting a client sees is "enabled".
+  setting-name:
+    type: string
+    description: >-
+      Short name for this instance in custom settings keys, in place of its
+      devicetree instance number. A board routes several instances of the same
+      processor, and in a client they are otherwise identically named rows told
+      apart only by a number whose order comes from however devicetree happened
+      to enumerate the nodes. The whole key is capped at 48 bytes.

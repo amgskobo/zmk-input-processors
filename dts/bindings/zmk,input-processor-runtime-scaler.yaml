@@ -9,7 +9,7 @@ description: |
   keyboard runs, and the arithmetic is done in 64 bits, so a large multiplier
   cannot turn a fast movement backwards.
 
-compatible: "zmk,input-processor-safe-scaler"
+compatible: "zmk,input-processor-runtime-scaler"
 
 include: ip_zero_param.yaml
 
@@ -39,3 +39,11 @@ properties:
       Denominator of the ratio, 1 to 32767. Together with multiplier a value of
       889/500 means 1.778x. The bound is what keeps the tracked remainder
       inside the int16_t slot ZMK provides for it.
+  setting-name:
+    type: string
+    description: >-
+      Short name for this instance in custom settings keys, in place of its
+      devicetree instance number. A board routes several instances of the same
+      processor, and in a client they are otherwise identically named rows told
+      apart only by a number whose order comes from however devicetree happened
+      to enumerate the nodes. The whole key is capped at 48 bytes.

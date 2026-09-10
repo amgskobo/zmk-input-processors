@@ -25,9 +25,9 @@
  * than carrying a separate processor to drop it. Zero numerator leaves zero
  * remainder, so the bound above still holds.
  */
-#define SAFE_SCALER_MULTIPLIER_MIN 0
-#define SAFE_SCALER_DIVISOR_MIN 1
-#define SAFE_SCALER_PARAM_MAX INT16_MAX
+#define RUNTIME_SCALER_MULTIPLIER_MIN 0
+#define RUNTIME_SCALER_DIVISOR_MIN 1
+#define RUNTIME_SCALER_PARAM_MAX INT16_MAX
 
 /*
  * The devicetree form, for BUILD_ASSERT. A call to the function below is not a
@@ -35,14 +35,14 @@
  * on the multiplier is worth checking here even though the unsigned runtime
  * path cannot cross it.
  */
-#define SAFE_SCALER_DT_PARAMS_VALID(mul, div)                                                      \
-    ((mul) >= SAFE_SCALER_MULTIPLIER_MIN && (mul) <= SAFE_SCALER_PARAM_MAX &&                      \
-     (div) >= SAFE_SCALER_DIVISOR_MIN && (div) <= SAFE_SCALER_PARAM_MAX)
+#define RUNTIME_SCALER_DT_PARAMS_VALID(mul, div)                                                   \
+    ((mul) >= RUNTIME_SCALER_MULTIPLIER_MIN && (mul) <= RUNTIME_SCALER_PARAM_MAX &&                \
+     (div) >= RUNTIME_SCALER_DIVISOR_MIN && (div) <= RUNTIME_SCALER_PARAM_MAX)
 
-static inline bool safe_scaler_params_valid(uint32_t multiplier, uint32_t divisor) {
+static inline bool runtime_scaler_params_valid(uint32_t multiplier, uint32_t divisor) {
     /* No lower bound on the multiplier: zero is allowed and it is unsigned. */
-    return multiplier <= SAFE_SCALER_PARAM_MAX && divisor >= SAFE_SCALER_DIVISOR_MIN &&
-           divisor <= SAFE_SCALER_PARAM_MAX;
+    return multiplier <= RUNTIME_SCALER_PARAM_MAX && divisor >= RUNTIME_SCALER_DIVISOR_MIN &&
+           divisor <= RUNTIME_SCALER_PARAM_MAX;
 }
 
 /*
@@ -58,7 +58,7 @@ static inline bool safe_scaler_params_valid(uint32_t multiplier, uint32_t diviso
  * overflow, so it saturates. Saturating keeps a large delta large; wrapping
  * would reverse it, which is the failure this function exists to avoid.
  */
-static inline int32_t safe_scaler_scale(int32_t value, uint32_t multiplier, uint32_t divisor,
+static inline int32_t runtime_scaler_scale(int32_t value, uint32_t multiplier, uint32_t divisor,
                                         int16_t *remainder) {
     int64_t numerator = (int64_t)value * (int64_t)multiplier;
 

@@ -32,7 +32,7 @@ static struct zmk_rpc_custom_subsystem_meta input_processors_meta = {
     .security = ZMK_STUDIO_RPC_HANDLER_UNSECURED,
 };
 
-ZMK_RPC_CUSTOM_SUBSYSTEM(amgskobo__input_processors, &input_processors_meta,
+ZMK_RPC_CUSTOM_SUBSYSTEM(amgskobo__runtime_processors, &input_processors_meta,
                          input_processors_namespace_handler);
 
 static bool input_processors_namespace_handler(const zmk_custom_CallRequest *request,
