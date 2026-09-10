@@ -33,9 +33,12 @@
  * with its device name, and nothing has to be registered, agreed between
  * modules, or typed into devicetree by a board author for that to hold.
  *
- * It also makes a duplicate key impossible rather than merely detectable:
- * devicetree node names are unique by construction, where a hand-written name
- * could be repeated on two nodes and silently shadow one of them.
+ * It also removes the commonest way to collide, since a name is no longer
+ * hand-written. It does not make collision impossible: DT_NODE_FULL_NAME is a
+ * node's own name and not its path, so devicetree keeps it unique only among
+ * siblings, and a board node and a module node under different parents can
+ * still pick the same one. That is what the startup check in
+ * input_processors_custom_settings.c is for.
  *
  * The cost is that renaming a node orphans its stored value, and that keys are
  * as long as the node names -- capped at

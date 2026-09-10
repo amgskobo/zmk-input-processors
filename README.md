@@ -476,10 +476,13 @@ between modules, or typed into devicetree by a board author** for that to hold.
 A module that does not follow the convention simply is not joined; its settings
 still appear in the flat list.
 
-It also makes a collision impossible rather than merely detectable. Devicetree
-node names are unique by construction, where a hand-written name could be
-repeated on two nodes and silently shadow one of them —
-`zmk_custom_setting_find()` returns the first match.
+It removes the commonest way to collide, since a name is no longer written by
+hand. It does not remove every way: `DT_NODE_FULL_NAME` is a node's own name
+and not its path, so devicetree keeps it unique only among siblings, and a
+board node under `/input_processors` can share a name with a module node at the
+root. Nothing downstream objects — `zmk_custom_setting_find()` returns the
+first match — so the module checks once at startup and logs
+`Duplicate setting key "..."`.
 
 Two costs are worth knowing. Renaming a node orphans its stored value, though
 a rename is a firmware change and needs a reflash anyway. And keys are as long
