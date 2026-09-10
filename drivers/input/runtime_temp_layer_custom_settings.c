@@ -34,20 +34,34 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
  * a client greys out a value that would look like the layer had stuck. */
 #define RUNTIME_TEMP_LAYER_MAX_MS 60000
 
-#define RUNTIME_TEMP_LAYER_SETTING(n, field, key, lo, hi)                                          \
+#define RUNTIME_TEMP_LAYER_SETTING(n, field, key, ...)                                            \
     ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
         runtime_temp_layer_cs_##field##_##n, ZMK_INPUT_PROCESSORS_SUBSYSTEM,                       \
-        ZMK_INPUT_PROCESSORS_SETTING_KEY(n, key),                        \
-        ZMK_CUSTOM_SETTING_VALUE_TYPE_INT32,                                                       \
+        ZMK_INPUT_PROCESSORS_SETTING_KEY(n, key), ZMK_CUSTOM_SETTING_VALUE_TYPE_INT32,             \
         ZMK_CUSTOM_SETTING_VALUE_INT32(DT_INST_PROP_OR(n, field, 0)),                              \
         ZMK_CUSTOM_SETTING_CONFIDENTIALITY_RPC_PUBLIC, ZMK_CUSTOM_SETTING_PERMISSION_UNSECURE,     \
-        ZMK_CUSTOM_SETTING_PERMISSION_SECURE, ZMK_CUSTOM_SETTING_RANGE_INT32(lo, hi));
+        ZMK_CUSTOM_SETTING_PERMISSION_SECURE, __VA_ARGS__);
 
+/*
+ * The layer is declared as a layer, not as a number in a range.
+ *
+ * A client that understands the constraint draws the keymap's own layer list,
+ * so the row reads "MOUSE (3)" instead of "3" -- and a layer is the one value
+ * here that a person cannot sanity-check by looking at it. The range is
+ * declared alongside so a client that does not understand LAYER_ID still
+ * refuses an impossible number rather than falling back to unbounded input.
+ *
+ * Neither is trusted: runtime_temp_layer_set_params() rejects a layer outside
+ * the keymap regardless, because a constraint is a drawing hint that reaches
+ * the client, not a rule the firmware is entitled to assume was obeyed.
+ */
 #define RUNTIME_TEMP_LAYER_SETTINGS(n)                                                             \
-    RUNTIME_TEMP_LAYER_SETTING(n, layer, "layer", 0, ZMK_KEYMAP_LAYERS_LEN - 1)                    \
-    RUNTIME_TEMP_LAYER_SETTING(n, timeout_ms, "timeout_ms", 0, RUNTIME_TEMP_LAYER_MAX_MS)          \
-    RUNTIME_TEMP_LAYER_SETTING(n, require_prior_idle_ms, "prior_idle_ms", 0,                       \
-                               RUNTIME_TEMP_LAYER_MAX_MS)
+    RUNTIME_TEMP_LAYER_SETTING(n, layer, "layer", ZMK_CUSTOM_SETTING_LAYER_ID,                     \
+                               ZMK_CUSTOM_SETTING_RANGE_INT32(0, ZMK_KEYMAP_LAYERS_LEN - 1))       \
+    RUNTIME_TEMP_LAYER_SETTING(n, timeout_ms, "timeout_ms",                                        \
+                               ZMK_CUSTOM_SETTING_RANGE_INT32(0, RUNTIME_TEMP_LAYER_MAX_MS))       \
+    RUNTIME_TEMP_LAYER_SETTING(n, require_prior_idle_ms, "prior_idle_ms",                          \
+                               ZMK_CUSTOM_SETTING_RANGE_INT32(0, RUNTIME_TEMP_LAYER_MAX_MS))
 
 DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TEMP_LAYER_SETTINGS)
 
