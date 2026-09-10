@@ -5,6 +5,7 @@ A Zephyr module that provides input processors for ZMK (Zephyr Mechanical Keyboa
 ## Features
 
 - **Absolute to Relative Processor** — Converts absolute pointer coordinates into relative motion, smoothed over two samples
+- **Safe Scaler** — Scales pointer events by a ratio held on the node, in 64-bit arithmetic, changeable while the keyboard is running
 - Modular architecture for adding new input processors
 - Device tree configuration support
 - Conditional build system via Kconfig
@@ -86,6 +87,86 @@ Which processors run is decided per event, from the layer active at that moment,
 
 `suppress-btn0` never drops a `BTN_0` release whose press was not suppressed here. Passing a release through is always safe - the press it belongs to already reached the host - while dropping one would leave the button held down with nothing left to release it. That record is cleared on a layer change too.
 
+### Enable the Safe Scaler
+
+`zmk,input-processor-safe-scaler` scales relative pointer events, like ZMK's
+own `zmk,input-processor-scaler`. It differs in two ways.
+
+**The arithmetic is done in 64 bits.** The stock scaler holds
+`event->value * multiplier` in an `int16_t`, so with a multiplier of 889 any
+delta of 37 or more wraps negative before it is divided, and the pointer jumps
+backwards exactly when it is moving fastest. Cormoran's Runtime Input Processor
+inherited the same expression. Here the numerator and quotient are `int64_t`
+and an out-of-range quotient saturates instead of wrapping, so a fast movement
+stays a fast movement.
+
+**The ratio is a property, not a pair of chain cells.** That is what makes it
+addressable: a chain cell can only be identified as "the second number in the
+fourth slot of this listener", which stops meaning the same thing as soon as
+the chain is edited. A node property has a name, so it can be published,
+listed, and changed at runtime.
+
+```dts
+/ {
+    input_processors {
+        pointer_scaler: pointer_scaler {
+            compatible = "zmk,input-processor-safe-scaler";
+            #input-processor-cells = <0>;
+            type = <INPUT_EV_REL>;
+            codes = <INPUT_REL_X>, <INPUT_REL_Y>;
+            multiplier = <889>;
+            divisor = <500>;
+            track-remainders;
+        };
+    };
+};
+
+&trackpad_listener {
+    input-processors = <&zip_absolute_to_relative>, <&pointer_scaler>;
+};
+```
+
+Note the chain entry takes no numbers. `track-remainders` is what keeps the
+fraction that division discards, so a ratio below 1 still moves the pointer.
+
+#### Configuration Reference
+
+| Property | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `type` | int | `INPUT_EV_REL` (2) | Event type to act on. |
+| `codes` | array | *required* | Event codes to scale. Anything else passes through untouched. |
+| `multiplier` | int | *required* | Numerator, 1 to 32767. |
+| `divisor` | int | *required* | Denominator, 1 to 32767. |
+
+Both bounds are correctness limits rather than chosen ones: ZMK keeps a tracked
+remainder in an `int16_t` slot, and holding the two numbers inside the positive
+`int16` range is what guarantees the remainder fits it. A value outside the
+range fails the build through a `BUILD_ASSERT`, and is refused at runtime.
+
+### Changing Parameters at Runtime
+
+Every parameter in this module is published through
+[zmk-feature-custom-settings](https://github.com/cormoran/zmk-feature-custom-settings)
+when `CONFIG_ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS=y`. They appear under the
+`amgskobo__input_processors` subsystem in any Studio client that renders the
+custom settings list, with the declared type and range driving the widget, so
+this module ships no page and no protocol of its own.
+
+Keys are named `<processor>.<parameter>.<devicetree instance index>`, for
+example `safe_scaler.mul.0`. The index is there because a board routes more
+than one instance — a pointer speed and a scroll speed, say — and each keeps
+its own values.
+
+The registry also owns persistence. The drivers store nothing themselves, which
+is what keeps a value from having two owners that can disagree after a reboot.
+With the option off, which is the default and what an upstream ZMK build gets,
+none of it is compiled and the devicetree values are fixed.
+
+The option needs `zmk-feature-custom-settings`, and so the patched ZMK that
+carries the custom Studio RPC protocol. Processors can also be driven from C
+directly — see `include/zmk-input-processors/safe_scaler.h`.
+
+
 ## Project Structure
 
 ```
@@ -98,12 +179,18 @@ Which processors run is decided per event, from the layer active at that moment,
 │   └── input/
 │       ├── CMakeLists.txt            # Input drivers build config
 │       ├── Kconfig                   # Input drivers Kconfig
-│       └── input_processor_absolute_to_relative.c
+│       ├── input_processor_absolute_to_relative.c
+│       ├── input_processor_safe_scaler.c
+│       ├── input_processors_custom_settings.c  # shared settings namespace
+│       └── safe_scaler_custom_settings.c
+├── include/
+│   └── zmk-input-processors/       # runtime APIs and the settings namespace
 ├── dts/
 │   ├── behaviors/
 │   │   └── input_processor_absolute_to_relative.dtsi
 │   └── bindings/
-│       └── zmk,input-processor-absolute-to-relative.yaml
+│       ├── zmk,input-processor-absolute-to-relative.yaml
+│       └── zmk,input-processor-safe-scaler.yaml
 ├── zephyr/
 │   └── module.yml                    # Zephyr module registration
 └── .github/
@@ -111,6 +198,20 @@ Which processors run is decided per event, from the layer active at that moment,
 ```
 
 ## Development
+
+### Tests
+
+Arithmetic that has no Zephyr dependency lives in a header under `include/`
+and is covered by host tests:
+
+```bash
+./tests/run.sh
+```
+
+Not everything needs this. The scaler has it because its six lines of
+arithmetic shipped wrong in two independent implementations and were found on
+hardware rather than in review, which is exactly the shape of thing worth
+pinning where it can be checked in a second.
 
 ### Adding a New Input Processor
 

@@ -10,3 +10,23 @@ config ZMK_INPUT_PROCESSOR_ABSOLUTE_TO_RELATIVE
         depends on (!ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL)
 
 
+
+DT_COMPAT_ZMK_INPUT_PROCESSOR_SAFE_SCALER := zmk,input-processor-safe-scaler
+
+config ZMK_INPUT_PROCESSOR_SAFE_SCALER
+		bool
+		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_SAFE_SCALER))
+		depends on ZMK_POINTING
+
+config ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS
+	bool "Publish input processor parameters through zmk-feature-custom-settings"
+	depends on ZMK_CUSTOM_SETTINGS
+	help
+	  Registers this module's processor parameters in the cross-module custom
+	  settings registry, so a Studio client lists and edits them with no page
+	  of its own: the declared type and range drive the widget. The registry
+	  then owns persistence, and the drivers store nothing, so there is one
+	  owner for each value. Needs zmk-feature-custom-settings, and so the
+	  patched ZMK that carries the custom Studio RPC protocol; with this off,
+	  which is the default and what an upstream ZMK build gets, none of it is
+	  compiled and the devicetree values are fixed.
