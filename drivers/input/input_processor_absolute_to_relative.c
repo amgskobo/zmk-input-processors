@@ -16,15 +16,17 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/layer_state_changed.h>
 
+#include <zmk-input-processors/absolute_to_relative.h>
+
 LOG_MODULE_REGISTER(absolute_to_relative, CONFIG_ZMK_LOG_LEVEL);
 
 /* Sentinel values for uninitialized coordinates */
 #define COORD_UNINITIALIZED UINT16_MAX
 #define COORD_INVALID_ZERO  0xFFF
 
+/* The devicetree values, which seed the live ones in data at init. */
 struct absolute_to_relative_config {
-    bool suppress_btn_touch;
-    bool suppress_btn0;
+    struct absolute_to_relative_suppression suppression;
 };
 
 struct absolute_to_relative_data {
@@ -47,7 +49,42 @@ struct absolute_to_relative_data {
      * held down on the host with nothing left to release it.
      */
     bool btn0_press_suppressed;
+    /*
+     * The live suppression flags. Two independent booleans, each read and
+     * written as a single aligned store, and neither one's correctness depends
+     * on the other's value, so they need no lock the way a ratio or a set of
+     * orientation flags does.
+     */
+    struct absolute_to_relative_suppression suppression;
 };
+
+int absolute_to_relative_get_suppression(const struct device *dev,
+                                         struct absolute_to_relative_suppression *out) {
+    if (dev == NULL || out == NULL) {
+        return -EINVAL;
+    }
+
+    const struct absolute_to_relative_data *data = dev->data;
+
+    *out = data->suppression;
+
+    return 0;
+}
+
+int absolute_to_relative_set_suppression(const struct device *dev,
+                                         const struct absolute_to_relative_suppression *flags) {
+    if (dev == NULL || flags == NULL) {
+        return -EINVAL;
+    }
+
+    struct absolute_to_relative_data *data = dev->data;
+
+    data->suppression = *flags;
+
+    LOG_DBG("%s: suppress btn_touch %d, btn0 %d", dev->name, flags->btn_touch, flags->btn0);
+
+    return 0;
+}
 
 /**
  * Drop the reference point, so the next sample on each axis establishes a new
@@ -127,15 +164,15 @@ static inline bool process_axis(struct input_event *event, uint16_t *previous_po
  * the previous contact; skipping the reset in that case would measure the new
  * contact against the old one's position.
  */
-static int handle_touch_button(struct input_event *event, struct absolute_to_relative_data *data,
-                               const struct absolute_to_relative_config *config) {
+static int handle_touch_button(struct input_event *event,
+                               struct absolute_to_relative_data *data) {
     drop_reference(data);
 
     if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
         LOG_DBG("Touch %s - reference dropped", event->value ? "started" : "released");
     }
 
-    if (config->suppress_btn_touch) {
+    if (data->suppression.btn_touch) {
         if (IS_ENABLED(CONFIG_ZMK_LOG_LEVEL_DBG)) {
             LOG_DBG("Suppressing BTN_TOUCH");
         }
@@ -154,9 +191,9 @@ static int handle_touch_button(struct input_event *event, struct absolute_to_rel
  * that reached the host on another layer keeps its release, so the button can
  * never be left stuck down.
  */
-static int handle_button_suppress(struct input_event *event, struct absolute_to_relative_data *data,
-                                  const struct absolute_to_relative_config *config) {
-    if (!config->suppress_btn0) {
+static int handle_button_suppress(struct input_event *event,
+                                  struct absolute_to_relative_data *data) {
+    if (!data->suppression.btn0) {
         /* Not suppressing here, so nothing of ours is outstanding. */
         data->btn0_press_suppressed = false;
         return ZMK_INPUT_PROC_CONTINUE;
@@ -185,16 +222,15 @@ static int handle_button_suppress(struct input_event *event, struct absolute_to_
 static int absolute_to_relative_handle_event(const struct device *dev, struct input_event *event,
                                              uint32_t param1, uint32_t param2,
                                              struct zmk_input_processor_state *state) {
-    const struct absolute_to_relative_config *config = dev->config;
     struct absolute_to_relative_data *data = (struct absolute_to_relative_data *)dev->data;
 
     /* Handle button events */
     if (event->type == INPUT_EV_KEY) {
         if (event->code == INPUT_BTN_TOUCH) {
-            return handle_touch_button(event, data, config);
+            return handle_touch_button(event, data);
         }
         if (event->code == INPUT_BTN_0) {
-            return handle_button_suppress(event, data, config);
+            return handle_button_suppress(event, data);
         }
     }
 
@@ -241,10 +277,11 @@ static int absolute_to_relative_init(const struct device *dev) {
     const struct absolute_to_relative_config *config = dev->config;
 
     data->btn0_press_suppressed = false;
+    data->suppression = config->suppression;
     drop_reference(data);
 
-    LOG_INF("Initialized (suppress_btn_touch=%d, suppress_btn0=%d)",
-            config->suppress_btn_touch, config->suppress_btn0);
+    LOG_INF("Initialized (suppress_btn_touch=%d, suppress_btn0=%d)", data->suppression.btn_touch,
+            data->suppression.btn0);
 
     return 0;
 }
@@ -268,8 +305,11 @@ static const struct zmk_input_processor_driver_api absolute_to_relative_driver_a
     };                                                                                  \
     static const struct absolute_to_relative_config                                    \
         processor_absolute_to_relative_config_##n = {                                  \
-            .suppress_btn_touch = DT_INST_PROP_OR(n, suppress_btn_touch, false),       \
-            .suppress_btn0 = DT_INST_PROP_OR(n, suppress_btn0, false),                 \
+            .suppression =                                                              \
+                {                                                                       \
+                    .btn_touch = DT_INST_PROP_OR(n, suppress_btn_touch, false),         \
+                    .btn0 = DT_INST_PROP_OR(n, suppress_btn0, false),                   \
+                },                                                                      \
         };                                                                              \
     DEVICE_DT_INST_DEFINE(n, absolute_to_relative_init, NULL,                         \
                           &processor_absolute_to_relative_data_##n,                    \

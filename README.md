@@ -4,10 +4,11 @@ A Zephyr module that provides input processors for ZMK (Zephyr Mechanical Keyboa
 
 ## Features
 
-- **Absolute to Relative Processor** — Converts absolute pointer coordinates into relative motion, smoothed over two samples
+- **Absolute to Relative Processor** — Converts absolute pointer coordinates into relative motion, smoothed over two samples, with runtime button suppression
 - **Runtime Scaler** — Scales pointer events by a ratio held on the node, in 64-bit arithmetic
 - **Runtime Transform** — Swaps and inverts axes from three flags held on the node
 - **Runtime Code Mapper** — Rewrites event codes, with a switch that turns the map off
+- **Runtime Temp Layer** — Raises a layer while a pointer is in use, on a layer and timers held on the node
 - Modular architecture for adding new input processors
 - Device tree configuration support
 - Conditional build system via Kconfig
@@ -80,6 +81,15 @@ Then wire it into your input handler chain according to your ZMK configuration.
 | :--- | :--- | :--- | :--- |
 | `suppress-btn-touch` | bool | false | Consume `INPUT_BTN_TOUCH` after using it to drop the reference point, so it does not reach the mouse HID as a button press. |
 | `suppress-btn0` | bool | false | Consume `INPUT_BTN_0` when the trackpad reports a physical click. |
+| `setting-name` | string | instance number | Short name for this instance in settings keys. |
+
+Both suppression flags are runtime values — they decide whether a pad's
+physical click reaches the host at all, which is the kind of thing that wants
+trying rather than deciding. On a pad that also carries tap-to-click, one
+setting is a duplicate button and the other is a missing one, and which is
+which depends on the pad. Turning `suppress-btn0` off does not release a press
+already swallowed: that press's release still passes through, for the same
+reason it does across a layer change.
 
 ### Layer Changes
 
@@ -112,6 +122,12 @@ moment the chain is edited.
 
 So every runtime processor declares `#input-processor-cells = <0>` and carries
 its parameters as properties instead. A chain entry takes no numbers.
+
+`zmk,input-processor-absolute-to-relative` is the exception: it takes runtime
+parameters but keeps its plain name. The prefix exists to tell a live processor
+apart from the fixed upstream one it replaces, and this processor has no
+upstream counterpart to be confused with — so the prefix would carry no
+information, while the rename would break every configuration already using it.
 
 ### Enable the Runtime Scaler
 
@@ -243,6 +259,59 @@ The devicetree property is the negative one because a Zephyr boolean is
 presence-based and so cannot default to true. The setting a client sees is the
 plain positive `enabled`.
 
+### Enable the Runtime Temp Layer
+
+`zmk,input-processor-runtime-temp-layer` raises a layer while a pointer is in
+use, like ZMK's own `zmk,input-processor-temp-layer`: movement brings the layer
+up, a key press outside the excluded positions drops it, a timeout drops it,
+and a recent key press stops it coming up at all.
+
+All three numbers are node properties, where upstream takes the layer and the
+timeout from chain cells. These are the values a person actually revises after
+living with a pointer for a week — how long the layer stays up, and how
+recently a keypress blocks it — and having to rebuild to try one is what stops
+people converging on values that suit them.
+
+```dts
+runtime_mouse_layer: runtime_mouse_layer {
+    compatible = "zmk,input-processor-runtime-temp-layer";
+    #input-processor-cells = <0>;
+    setting-name = "mouse";
+    layer = <3>;
+    timeout-ms = <400>;
+    require-prior-idle-ms = <300>;
+    excluded-positions = <7 8 9 13 14 23 24 25 26>;
+};
+```
+
+#### Configuration Reference
+
+| Property | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `layer` | int | *required* | Layer to raise, as a layer **ID**. |
+| `timeout-ms` | int | *required* | Pointer silence before the layer drops. 0 = never. |
+| `require-prior-idle-ms` | int | 0 | Window after a key press in which the layer will not come up. |
+| `excluded-positions` | array | *none* | Positions that do not drop the layer. |
+| `setting-name` | string | instance number | Short name for this instance in settings keys. |
+
+`excluded-positions` stays structural. A list of key positions is not something
+a generic settings list can draw, and it belongs to the physical layout rather
+than to taste.
+
+Three things differ from upstream beyond the parameters:
+
+- **Work items are per instance.** Upstream keeps one global array indexed by
+  layer and its work handler resolves the device with `DEVICE_DT_INST_GET(0)`,
+  so a second instance drives the first one's state.
+- **The layer number is used consistently as an ID.** Upstream activates with
+  `zmk_keymap_layer_activate(toggle_layer)`, which takes an ID, but checks with
+  `zmk_keymap_layer_active(zmk_keymap_layer_index_to_id(toggle_layer))`,
+  converting a value that was never an index. The two agree until layers are
+  reordered — which a Studio client can do.
+- **No message queue.** Activation and deactivation are a plain work item and a
+  delayable one on the instance, which is what removes the need for a queue and
+  its depth Kconfig.
+
 ### Changing Parameters at Runtime
 
 Every parameter in this module is published through
@@ -266,6 +335,24 @@ is what keeps a value from having two owners that can disagree after a reboot.
 With the option off, which is the default and what an upstream ZMK build gets,
 none of it is compiled and the devicetree values are fixed.
 
+A stored value reaches the hardware on `zmk_custom_settings_initialized`, the
+one-shot event raised by the settings-subtree commit that ends the boot
+`settings_load()` pass. Two things make that the only correct signal, and both
+are easy to get wrong:
+
+- **A `SYS_INIT` is too early.** It runs before `settings_load()`, so it reads
+  the devicetree default. The value would persist and display correctly in a
+  client while having no effect at all on the hardware, until something wrote
+  it again in that session.
+- **`zmk_custom_setting_changed` is not raised by the load.** Values arriving
+  from storage are applied to the registry without it, so a listener on that
+  event alone would never see a stored value either.
+
+Each settings file therefore subscribes to both events and re-reads every
+instance, which covers boot and every later edit. In a build without
+`CONFIG_SETTINGS` the event never fires, which is correct: nothing was stored,
+and the drivers already start from their devicetree values.
+
 The option needs `zmk-feature-custom-settings`, and so the patched ZMK that
 carries the custom Studio RPC protocol. Processors can also be driven from C
 directly — see `include/zmk-input-processors/runtime_scaler.h`.
@@ -287,10 +374,13 @@ directly — see `include/zmk-input-processors/runtime_scaler.h`.
 │       ├── input_processor_runtime_scaler.c
 │       ├── input_processor_runtime_transform.c
 │       ├── input_processor_runtime_code_mapper.c
+│       ├── input_processor_runtime_temp_layer.c
 │       ├── input_processors_custom_settings.c  # shared settings namespace
+│       ├── absolute_to_relative_custom_settings.c
 │       ├── runtime_scaler_custom_settings.c
 │       ├── runtime_transform_custom_settings.c
-│       └── runtime_code_mapper_custom_settings.c
+│       ├── runtime_code_mapper_custom_settings.c
+│       └── runtime_temp_layer_custom_settings.c
 ├── include/
 │   └── zmk-input-processors/       # runtime APIs and the settings namespace
 ├── dts/
@@ -300,7 +390,8 @@ directly — see `include/zmk-input-processors/runtime_scaler.h`.
 │       ├── zmk,input-processor-absolute-to-relative.yaml
 │       ├── zmk,input-processor-runtime-scaler.yaml
 │       ├── zmk,input-processor-runtime-transform.yaml
-│       └── zmk,input-processor-runtime-code-mapper.yaml
+│       ├── zmk,input-processor-runtime-code-mapper.yaml
+│       └── zmk,input-processor-runtime-temp-layer.yaml
 ├── zephyr/
 │   └── module.yml                    # Zephyr module registration
 └── .github/

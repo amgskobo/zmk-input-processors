@@ -1,0 +1,55 @@
+# Copyright (c) 2026 amgskobo
+# SPDX-License-Identifier: MIT
+
+description: |
+  Raises a layer while a pointer is in use, with its numbers held on the node.
+
+  Unlike zmk,input-processor-temp-layer the layer and the timeout are named
+  properties rather than chain parameter cells, so all three numbers can be
+  listed and changed while the keyboard runs. They are the values a person
+  revises after living with a pointer for a week.
+
+  excluded-positions stays structural. A list of key positions is not something
+  a generic settings list can draw, and it belongs to the physical layout
+  rather than to taste.
+
+compatible: "zmk,input-processor-runtime-temp-layer"
+
+include: ip_zero_param.yaml
+
+properties:
+  layer:
+    type: int
+    required: true
+    description: >-
+      Layer to raise, as a layer ID -- the same thing zmk_keymap_layer_activate
+      takes, not a position in the keymap. The two agree until layers are
+      reordered, and diverge afterwards.
+  timeout-ms:
+    type: int
+    required: true
+    description: >-
+      Milliseconds of pointer silence before the layer drops. Zero leaves the
+      layer up until a key outside excluded-positions is pressed.
+  require-prior-idle-ms:
+    type: int
+    default: 0
+    description: >-
+      Milliseconds after a key press during which the layer will not come up.
+      This is what stops a brush against the pad mid-word from turning the next
+      key into a click. Zero disables the guard.
+  excluded-positions:
+    type: array
+    description: >-
+      Key positions that do not drop the layer: the clicks, side buttons and
+      anything else the pointer hand reaches for while the layer is up. Every
+      other press drops it immediately. With no list at all, no key press drops
+      the layer and only the timeout does.
+  setting-name:
+    type: string
+    description: >-
+      Short name for this instance in custom settings keys, in place of its
+      devicetree instance number. A board routes several instances of the same
+      processor, and in a client they are otherwise identically named rows told
+      apart only by a number whose order comes from however devicetree happened
+      to enumerate the nodes. The whole key is capped at 48 bytes.

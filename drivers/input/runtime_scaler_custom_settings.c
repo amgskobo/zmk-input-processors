@@ -82,25 +82,37 @@ static void runtime_scaler_apply_settings(void) {
     DT_INST_FOREACH_STATUS_OKAY(RUNTIME_SCALER_APPLY)
 }
 
-static int runtime_scaler_setting_changed_cb(const zmk_event_t *eh) {
-    const struct zmk_custom_setting_changed *event = as_zmk_custom_setting_changed(eh);
+static int runtime_scaler_settings_event_cb(const zmk_event_t *eh) {
+    ARG_UNUSED(eh);
 
-    /* Cheap enough to re-read every instance rather than match the setting. */
-    if (event != NULL) {
-        runtime_scaler_apply_settings();
-    }
+    /*
+     * Both subscribed events mean the same thing here -- some stored value may
+     * now differ from what the processor is running -- and re-reading every
+     * instance is cheaper than working out which one moved.
+     */
+    runtime_scaler_apply_settings();
 
     return ZMK_EV_EVENT_BUBBLE;
 }
 
-ZMK_LISTENER(runtime_scaler_custom_settings, runtime_scaler_setting_changed_cb);
+/*
+ * Applied on two signals, and deliberately not from a SYS_INIT.
+ *
+ * zmk_custom_settings_initialized fires from the settings-subtree commit that
+ * ends the boot settings_load pass, which is the only point at which a stored
+ * value is both present and readable. A SYS_INIT is too early: it runs before
+ * settings_load(), so it would read the devicetree default and leave the
+ * processor on it for the rest of the session -- the value would persist and
+ * show correctly in a client while having no effect on the hardware.
+ *
+ * The load path stores values without raising zmk_custom_setting_changed, so
+ * that event alone would never deliver a stored value either. Together the two
+ * cover boot and every later edit.
+ *
+ * In a build without CONFIG_SETTINGS nothing is stored and the event never
+ * fires, which is correct: the driver already starts from its devicetree
+ * values.
+ */
+ZMK_LISTENER(runtime_scaler_custom_settings, runtime_scaler_settings_event_cb);
 ZMK_SUBSCRIPTION(runtime_scaler_custom_settings, zmk_custom_setting_changed);
-
-/* Stored values land before this runs, so the ratio starts where it left off. */
-static int runtime_scaler_custom_settings_init(void) {
-    runtime_scaler_apply_settings();
-
-    return 0;
-}
-
-SYS_INIT(runtime_scaler_custom_settings_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+ZMK_SUBSCRIPTION(runtime_scaler_custom_settings, zmk_custom_settings_initialized);
