@@ -108,7 +108,7 @@ otherwise indistinguishable from a chain:
 
 ```dts
 input-processors = <&zip_xy_transform (INPUT_TRANSFORM_Y_INVERT)>,  /* fixed  */
-                   <&runtime_scroll_transform>;                     /* live   */
+                   <&scroll_xform>;                     /* live   */
 ```
 
 Each runtime processor mirrors an upstream `zip_*` one and behaves the same
@@ -140,8 +140,8 @@ input-processors = <&zip_scaler 1 16>;      /* here */
 input-processors = <&zip_scaler 4 1>;       /* and differently here */
 
 /* here: one node is one set of values, wherever it appears */
-input-processors = <&runtime_scroll_scaler>;
-input-processors = <&runtime_scroll_scaler>;   /* the same speed, necessarily */
+input-processors = <&scroll_scale>;
+input-processors = <&scroll_scale>;   /* the same speed, necessarily */
 ```
 
 That is the trade, and it is the right way round: a value that cannot be named
@@ -174,9 +174,9 @@ two positions and move the value between them:
 
 ```dts
 input-processors = <&zip_absolute_to_relative>,
-                   <&pointer_scaler_pre>,   /* 1/1 — before the curve */
+                   <&pointer_scale_pre>,   /* 1/1 — before the curve */
                    <&vector_accel>,
-                   <&pointer_scaler>;       /* 889/500 — after it */
+                   <&pointer_scale>;       /* 889/500 — after it */
 ```
 
 "Scale before the curve instead of after it" is then two edits rather than a
@@ -240,7 +240,7 @@ listed, and changed at runtime.
 ```dts
 / {
     input_processors {
-        pointer_scaler: pointer_scaler {
+        pointer_scale: pointer_scale {
             compatible = "zmk,input-processor-runtime-scaler";
             #input-processor-cells = <0>;
             type = <INPUT_EV_REL>;
@@ -253,7 +253,7 @@ listed, and changed at runtime.
 };
 
 &trackpad_listener {
-    input-processors = <&zip_absolute_to_relative>, <&pointer_scaler>;
+    input-processors = <&zip_absolute_to_relative>, <&pointer_scale>;
 };
 ```
 
@@ -291,7 +291,7 @@ three checkboxes in a client. A trackpad mounted the other way up is then a
 setting rather than a rebuild.
 
 ```dts
-runtime_scroll_transform: runtime_scroll_transform {
+scroll_xform: scroll_xform {
     compatible = "zmk,input-processor-runtime-transform";
     #input-processor-cells = <0>;
     type = <INPUT_EV_REL>;
@@ -332,7 +332,7 @@ stage keeps its shape and its values, and switching it back on restores the
 route exactly.
 
 ```dts
-runtime_scroll_mapper: runtime_scroll_mapper {
+scroll_map: scroll_map {
     compatible = "zmk,input-processor-runtime-code-mapper";
     #input-processor-cells = <0>;
     type = <INPUT_EV_REL>;
@@ -367,7 +367,7 @@ recently a keypress blocks it — and having to rebuild to try one is what stops
 people converging on values that suit them.
 
 ```dts
-runtime_mouse_layer: runtime_mouse_layer {
+pointer_layer: pointer_layer {
     compatible = "zmk,input-processor-runtime-temp-layer";
     #input-processor-cells = <0>;
     layer = <3>;
@@ -434,13 +434,37 @@ this module ships no page and no protocol of its own.
 A key is the owning node's devicetree name, then the field:
 
 ```
-runtime_pointer_scaler.mul
-runtime_pointer_scaler.div
-runtime_scroll_scaler.mul
-runtime_scroll_scaler.div
-runtime_scroll_x_scaler.mul
-runtime_scroll_x_scaler.div
+pointer_scale.mul
+pointer_scale.div
+scroll_scale.mul
+scroll_scale.div
+slider_scale_h.mul
+slider_scale_h.div
 ```
+
+**So name nodes as though they were keys, because they are.** A name is what a
+client shows, what a person searches for, and the prefix a chain view joins on.
+`<route>_<what it does>[_<which one>]` sorts a route's stages together and stays
+short:
+
+```
+pointer_abs_rel   pointer_xform   pointer_scale_pre   pointer_accel
+pointer_scale     pointer_layer   stick_xform         stick_accel
+scroll_abs_rel    scroll_xform    scroll_scale        scroll_map
+pad_scale_v       pad_scale_h     slider_scale_v      slider_scale_h
+```
+
+Length is not a style question here. A key is capped at 48 bytes and a name
+that overruns it fails the build; and an option label — which is how a client
+offers a node in a dropdown — is capped at 32 bytes including the terminator,
+where nothing fails and the name is simply truncated. A node whose name should
+be selectable therefore needs to stay under 31 characters. The names above run
+to 17.
+
+A module's own dtsi singleton fixes the name it ships with. Where that name is
+too long or says the wrong thing, declare the node on the board instead of
+including the dtsi — an included node that is never referenced is still built
+and still publishes its keys unless the module marked it `/omit-if-no-ref/`.
 
 The node name is deliberate, and it is what makes this work on a keyboard
 nobody wrote the client for. A view drawing the chain walks devicetree for the
