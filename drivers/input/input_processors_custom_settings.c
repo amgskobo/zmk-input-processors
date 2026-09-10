@@ -16,9 +16,6 @@
  * editor.
  */
 
-#include <string.h>
-
-#include <zephyr/init.h>
 #include <zephyr/logging/log.h>
 
 #include <cormoran/zmk/custom_settings.h>
@@ -46,45 +43,3 @@ static bool input_processors_namespace_handler(const zmk_custom_CallRequest *req
 
     return false;
 }
-
-/*
- * Two instances of one processor can end up sharing a settings key, and
- * nothing downstream will say so.
- *
- * A key ends in the node's setting-name, which is a free-form string a board
- * writes, so two nodes can carry the same one. The registry does not reject
- * that: zmk_custom_setting_find() returns the first match, so a client's write
- * always lands on whichever instance linked first, and the second one silently
- * keeps its devicetree value while appearing in the list as though it were
- * being edited. A stored value restores into only one of them too.
- *
- * The check cannot be a BUILD_ASSERT -- string equality across instances is
- * not something the preprocessor can evaluate -- so it runs once at startup
- * and says which key is duplicated. It walks descriptors, not values, so it
- * needs nothing from settings_load() and is safe this early.
- */
-static int input_processors_check_unique_keys(void) {
-    ZMK_CUSTOM_SETTING_FOREACH(setting) {
-        if (strcmp(setting->custom_subsystem_id, ZMK_INPUT_PROCESSORS_SUBSYSTEM) != 0) {
-            continue;
-        }
-
-        ZMK_CUSTOM_SETTING_FOREACH(other) {
-            if (other == setting) {
-                /* Only report a pair once: stop at the first of the two. */
-                break;
-            }
-
-            if (strcmp(other->custom_subsystem_id, ZMK_INPUT_PROCESSORS_SUBSYSTEM) == 0 &&
-                strcmp(other->key, setting->key) == 0) {
-                LOG_ERR("Duplicate setting key \"%s\": give these nodes different "
-                        "setting-name values, or only one of them is editable",
-                        setting->key);
-            }
-        }
-    }
-
-    return 0;
-}
-
-SYS_INIT(input_processors_check_unique_keys, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);

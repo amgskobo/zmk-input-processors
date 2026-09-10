@@ -81,7 +81,6 @@ Then wire it into your input handler chain according to your ZMK configuration.
 | :--- | :--- | :--- | :--- |
 | `suppress-btn-touch` | bool | false | Consume `INPUT_BTN_TOUCH` after using it to drop the reference point, so it does not reach the mouse HID as a button press. |
 | `suppress-btn0` | bool | false | Consume `INPUT_BTN_0` when the trackpad reports a physical click. |
-| `setting-name` | string | instance number | Short name for this instance in settings keys. |
 
 Both suppression flags are runtime values — they decide whether a pad's
 physical click reaches the host at all, which is the kind of thing that wants
@@ -157,12 +156,10 @@ Every processor here keeps its state in its own `data` struct, and the
 temp-layer's work items are per instance, so instances do not interfere. Two
 things are worth knowing anyway:
 
-- **`setting-name` must be unique per processor.** Keys end in it, and the
-  registry does not reject a duplicate: `zmk_custom_setting_find()` returns the
-  first match, so a client's write always lands on whichever instance linked
-  first while the second silently keeps its devicetree value. String equality
-  across instances is not something the preprocessor can check, so the module
-  checks it once at startup and logs `Duplicate setting key "..."`.
+- **Settings keys cannot collide.** A key is the node's devicetree name plus
+  the field, and devicetree node names are unique by construction, so two
+  instances cannot end up editing each other's values. Nothing is written by
+  hand and nothing has to be checked.
 - **Two temp-layer instances pointed at one layer share it.** A ZMK layer is a
   bit, not a reference count, so whichever drops it first drops it for both.
   It resolves itself rather than sticking — the layer change reaches both, each
@@ -228,7 +225,6 @@ fraction that division discards, so a ratio below 1 still moves the pointer.
 | `codes` | array | *required* | Event codes to scale. Anything else passes through untouched. |
 | `multiplier` | int | *required* | Numerator, 0 to 32767. Zero kills the axis. |
 | `divisor` | int | *required* | Denominator, 1 to 32767. |
-| `setting-name` | string | instance number | Short name for this instance in settings keys. |
 
 Both bounds are correctness limits rather than chosen ones: ZMK keeps a tracked
 remainder in an `int16_t` slot, and holding the two numbers inside the positive
@@ -247,7 +243,6 @@ setting rather than a rebuild.
 runtime_scroll_transform: runtime_scroll_transform {
     compatible = "zmk,input-processor-runtime-transform";
     #input-processor-cells = <0>;
-    setting-name = "scroll";
     type = <INPUT_EV_REL>;
     x-codes = <INPUT_REL_X>;
     y-codes = <INPUT_REL_Y>;
@@ -289,7 +284,6 @@ route exactly.
 runtime_scroll_mapper: runtime_scroll_mapper {
     compatible = "zmk,input-processor-runtime-code-mapper";
     #input-processor-cells = <0>;
-    setting-name = "scroll";
     type = <INPUT_EV_REL>;
     map = <INPUT_REL_Y INPUT_REL_WHEEL>,
           <INPUT_REL_X INPUT_REL_HWHEEL>;
@@ -325,7 +319,6 @@ people converging on values that suit them.
 runtime_mouse_layer: runtime_mouse_layer {
     compatible = "zmk,input-processor-runtime-temp-layer";
     #input-processor-cells = <0>;
-    setting-name = "mouse";
     layer = <3>;
     timeout-ms = <400>;
     require-prior-idle-ms = <300>;
@@ -341,7 +334,6 @@ runtime_mouse_layer: runtime_mouse_layer {
 | `timeout-ms` | int | *required* | Pointer silence before the layer drops. 0 = never. |
 | `require-prior-idle-ms` | int | 0 | Window after a key press in which the layer will not come up. |
 | `excluded-positions` | array | *none* | Positions that do not drop the layer. |
-| `setting-name` | string | instance number | Short name for this instance in settings keys. |
 
 `excluded-positions` stays structural. A list of key positions is not something
 a generic settings list can draw, and it belongs to the physical layout rather
@@ -370,33 +362,37 @@ when `CONFIG_ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS=y`. They appear under the
 custom settings list, with the declared type and range driving the widget, so
 this module ships no page and no protocol of its own.
 
-Keys are named `<what it is>.<which one>.<which field>`, so everything up to
-and including the instance identifies one node:
+A key is the owning node's devicetree name, then the field:
 
 ```
-runtime_scaler.pointer.mul
-runtime_scaler.pointer.div
-runtime_scaler.scroll.mul
-runtime_scaler.scroll.div
-runtime_scaler.scroll_x.mul
-runtime_scaler.scroll_x.div
+runtime_pointer_scaler.mul
+runtime_pointer_scaler.div
+runtime_scroll_scaler.mul
+runtime_scroll_scaler.div
+runtime_scroll_x_scaler.mul
+runtime_scroll_x_scaler.div
 ```
 
-The instance part is the node's `setting-name`, falling back to its devicetree
-instance number when it has none. Naming it is worth the line: a board routes
-several instances of the same processor — a pointer speed, a scroll speed and
-an axis kill are all scalers — and in a client they are otherwise identically
-named rows told apart only by a number whose order comes from however
-devicetree happened to enumerate the nodes.
+The node name is deliberate, and it is what makes this work on a keyboard
+nobody wrote the client for. A view drawing the chain walks devicetree for the
+processors in each listener and gets a `const struct device *` per stage, whose
+`->name` is `DEVICE_DT_NAME()`, which is `DT_NODE_FULL_NAME()` — the same
+string the key is built from. So a stage's settings are exactly the keys
+starting with its device name, and **nothing has to be registered, agreed
+between modules, or typed into devicetree by a board author** for that to hold.
+A module that does not follow the convention simply is not joined; its settings
+still appear in the flat list.
 
-The instance sits **before** the field rather than after it, which matters more
-than it looks. A client renders a flat sorted list; with the field first, the
-three scalers above interleave and each node's pair ends up three rows apart.
-This way they are contiguous, and a prefix match selects exactly one node —
-which is what a view drawing the chain needs in order to attach values to the
-stage they belong to.
+It also makes a collision impossible rather than merely detectable. Devicetree
+node names are unique by construction, where a hand-written name could be
+repeated on two nodes and silently shadow one of them —
+`zmk_custom_setting_find()` returns the first match.
 
-The whole key is capped at 48 bytes.
+Two costs are worth knowing. Renaming a node orphans its stored value, though
+a rename is a firmware change and needs a reflash anyway. And keys are as long
+as the node names, against a 48-byte cap: the longest this keyboard produces is
+`zip_absolute_to_relative_no_btn0.btn_touch` at 42 bytes, and a name that does
+not fit fails the build loudly rather than truncating.
 
 The registry also owns persistence. The drivers store nothing themselves, which
 is what keeps a value from having two owners that can disagree after a reboot.

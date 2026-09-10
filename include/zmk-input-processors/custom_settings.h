@@ -19,30 +19,27 @@
 #define ZMK_INPUT_PROCESSORS_SUBSYSTEM "amgskobo__runtime_processors"
 
 /*
- * The middle part of a setting key, identifying which instance it belongs to.
+ * A setting key is the owning node's devicetree name, then the field:
  *
- * A key is <what it is> . <which one> . <which field>, so everything up to and
- * including the instance identifies one node:
+ *     runtime_pointer_scaler.mul
+ *     runtime_pointer_scaler.div
+ *     runtime_scroll_scaler.mul
  *
- *     runtime_scaler.pointer.mul
- *     runtime_scaler.pointer.div
- *     runtime_scaler.scroll.mul
+ * The node name is the one identifier both halves of the problem already hold.
+ * A view drawing the chain walks devicetree for the processors in each
+ * listener and gets a `const struct device *` per stage, whose ->name is
+ * DEVICE_DT_NAME(), which is DT_NODE_FULL_NAME() -- the same string this
+ * builds the key from. So a stage's settings are the ones whose key starts
+ * with its device name, and nothing has to be registered, agreed between
+ * modules, or typed into devicetree by a board author for that to hold.
  *
- * A board routes several instances of the same processor -- a pointer speed, a
- * scroll speed and an axis kill are all scalers -- and in a client they are
- * otherwise identically named rows told apart only by a number whose order
- * comes from however devicetree happened to enumerate the nodes. So a node may
- * name itself with setting-name, and falls back to that number only when it
- * does not.
+ * It also makes a duplicate key impossible rather than merely detectable:
+ * devicetree node names are unique by construction, where a hand-written name
+ * could be repeated on two nodes and silently shadow one of them.
  *
- * The instance sits before the field rather than after it because a client
- * renders a flat sorted list: with the field first, two instances of one
- * processor interleave and a node's values end up several rows apart. This way
- * they are contiguous, and a prefix match selects exactly one node -- which is
- * what a view drawing the chain needs to attach values to the stage they
- * belong to.
- *
- * Keys are capped at CONFIG_ZMK_CUSTOM_SETTINGS_KEY_MAX_LEN (48 bytes)
- * including the processor and field parts, which short words clear easily.
+ * The cost is that renaming a node orphans its stored value, and that keys are
+ * as long as the node names -- capped at
+ * CONFIG_ZMK_CUSTOM_SETTINGS_KEY_MAX_LEN (48 bytes), which a too-long name
+ * fails loudly against at build time rather than silently truncating.
  */
-#define ZMK_INPUT_PROCESSORS_SETTING_NAME(n) DT_INST_PROP_OR(n, setting_name, STRINGIFY(n))
+#define ZMK_INPUT_PROCESSORS_SETTING_KEY(n, field) DT_NODE_FULL_NAME(DT_DRV_INST(n)) "." field

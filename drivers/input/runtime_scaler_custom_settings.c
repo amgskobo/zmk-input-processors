@@ -31,7 +31,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #define RUNTIME_SCALER_SETTING(n, field, key, lo)                                                  \
     ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
         runtime_scaler_cs_##field##_##n, ZMK_INPUT_PROCESSORS_SUBSYSTEM,                           \
-        "runtime_scaler." ZMK_INPUT_PROCESSORS_SETTING_NAME(n) "." key,                            \
+        ZMK_INPUT_PROCESSORS_SETTING_KEY(n, key),                            \
         ZMK_CUSTOM_SETTING_VALUE_TYPE_INT32,                                                       \
         ZMK_CUSTOM_SETTING_VALUE_INT32(DT_INST_PROP(n, field)),                                    \
         ZMK_CUSTOM_SETTING_CONFIDENTIALITY_RPC_PUBLIC, ZMK_CUSTOM_SETTING_PERMISSION_UNSECURE,     \

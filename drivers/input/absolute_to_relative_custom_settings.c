@@ -31,7 +31,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #define ABSOLUTE_TO_RELATIVE_SETTING(n, field, key)                                                \
     ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
         absolute_to_relative_cs_##field##_##n, ZMK_INPUT_PROCESSORS_SUBSYSTEM,                     \
-        "abs_to_rel." ZMK_INPUT_PROCESSORS_SETTING_NAME(n) "." key,                                \
+        ZMK_INPUT_PROCESSORS_SETTING_KEY(n, key),                                \
         ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL,                                                        \
         ZMK_CUSTOM_SETTING_VALUE_BOOL(DT_INST_PROP_OR(n, field, false)),                           \
         ZMK_CUSTOM_SETTING_CONFIDENTIALITY_RPC_PUBLIC, ZMK_CUSTOM_SETTING_PERMISSION_UNSECURE,     \

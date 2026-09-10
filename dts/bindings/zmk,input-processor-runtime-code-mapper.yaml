@@ -35,11 +35,3 @@ properties:
       Start with the map switched off. A Zephyr boolean is presence-based and
       so cannot default to true, which is why the devicetree property is the
       negative one while the setting a client sees is "enabled".
-  setting-name:
-    type: string
-    description: >-
-      Short name for this instance in custom settings keys, in place of its
-      devicetree instance number. A board routes several instances of the same
-      processor, and in a client they are otherwise identically named rows told
-      apart only by a number whose order comes from however devicetree happened
-      to enumerate the nodes. The whole key is capped at 48 bytes.

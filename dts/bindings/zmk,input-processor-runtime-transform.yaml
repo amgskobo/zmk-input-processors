@@ -41,11 +41,3 @@ properties:
   y-invert:
     type: boolean
     description: "Starting state: negate values travelling on the Y axis."
-  setting-name:
-    type: string
-    description: >-
-      Short name for this instance in custom settings keys, in place of its
-      devicetree instance number. A board routes several instances of the same
-      processor, and in a client they are otherwise identically named rows told
-      apart only by a number whose order comes from however devicetree happened
-      to enumerate the nodes. The whole key is capped at 48 bytes.

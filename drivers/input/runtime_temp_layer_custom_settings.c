@@ -37,7 +37,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #define RUNTIME_TEMP_LAYER_SETTING(n, field, key, lo, hi)                                          \
     ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
         runtime_temp_layer_cs_##field##_##n, ZMK_INPUT_PROCESSORS_SUBSYSTEM,                       \
-        "runtime_temp_layer." ZMK_INPUT_PROCESSORS_SETTING_NAME(n) "." key,                        \
+        ZMK_INPUT_PROCESSORS_SETTING_KEY(n, key),                        \
         ZMK_CUSTOM_SETTING_VALUE_TYPE_INT32,                                                       \
         ZMK_CUSTOM_SETTING_VALUE_INT32(DT_INST_PROP_OR(n, field, 0)),                              \
         ZMK_CUSTOM_SETTING_CONFIDENTIALITY_RPC_PUBLIC, ZMK_CUSTOM_SETTING_PERMISSION_UNSECURE,     \
