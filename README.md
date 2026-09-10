@@ -129,6 +129,55 @@ apart from the fixed upstream one it replaces, and this processor has no
 upstream counterpart to be confused with — so the prefix would carry no
 information, while the rename would break every configuration already using it.
 
+### What moving the parameters costs
+
+A chain cell belongs to the slot; a property belongs to the node. So upstream
+can put one device in two slots and give each its own numbers, and these
+processors cannot:
+
+```dts
+/* upstream: one device, two ratios */
+input-processors = <&zip_scaler 1 16>;      /* here */
+input-processors = <&zip_scaler 4 1>;       /* and differently here */
+
+/* here: one node is one set of values, wherever it appears */
+input-processors = <&runtime_scroll_scaler>;
+input-processors = <&runtime_scroll_scaler>;   /* the same speed, necessarily */
+```
+
+That is the trade, and it is the right way round: a value that cannot be named
+cannot be edited, and per-slot numbers are exactly what has no name. Two slots
+that want different values declare two nodes, which costs a few lines of
+devicetree and gives each one a key of its own. Two slots that want the *same*
+value are now guaranteed to keep it, where two chain cells could drift apart.
+
+### Multiple instances
+
+Every processor here keeps its state in its own `data` struct, and the
+temp-layer's work items are per instance, so instances do not interfere. Two
+things are worth knowing anyway:
+
+- **`setting-name` must be unique per processor.** Keys end in it, and the
+  registry does not reject a duplicate: `zmk_custom_setting_find()` returns the
+  first match, so a client's write always lands on whichever instance linked
+  first while the second silently keeps its devicetree value. String equality
+  across instances is not something the preprocessor can check, so the module
+  checks it once at startup and logs `Duplicate setting key "..."`.
+- **Two temp-layer instances pointed at one layer share it.** A ZMK layer is a
+  bit, not a reference count, so whichever drops it first drops it for both.
+  It resolves itself rather than sticking — the layer change reaches both, each
+  stops believing it holds the layer, and the next movement raises it again —
+  so it costs one dropped layer. Independent lifetimes need separate layers.
+
+One more consequence, for anyone adding a processor: a `#if` on a devicetree
+value is only valid while that value stays in devicetree. The temp-layer
+subscribes to position events conditionally, because `excluded-positions` is
+structural, but subscribes to keycode events unconditionally even though
+upstream gates them on `require-prior-idle-ms` — that one is a runtime value
+now, so an instance starting at zero can be given a real guard from a client,
+and a compiled-out subscription would leave the setting accepting edits and
+doing nothing.
+
 ### Enable the Runtime Scaler
 
 `zmk,input-processor-runtime-scaler` scales relative pointer events, like ZMK's

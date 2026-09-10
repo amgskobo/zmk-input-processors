@@ -16,6 +16,14 @@
  * layer and its work handler resolves the device with DEVICE_DT_INST_GET(0),
  * so a second instance drives the first one's state.
  *
+ * Two instances pointed at the same layer still share it, because a ZMK layer
+ * is a bit and not a reference count: whichever drops it first drops it for
+ * both. That resolves itself rather than sticking -- the layer change reaches
+ * both instances, each sees the layer is down and stops believing it holds it,
+ * and the next pointer movement raises it again -- so it costs one dropped
+ * layer, not a stuck one. Two instances wanting independent lifetimes need
+ * separate layers.
+ *
  * The layer number is used consistently as a layer ID. Upstream activates with
  * zmk_keymap_layer_activate(toggle_layer) -- an ID -- but checks with
  * zmk_keymap_layer_active(zmk_keymap_layer_index_to_id(toggle_layer)),
@@ -260,7 +268,25 @@ static int runtime_temp_layer_event_cb(const zmk_event_t *eh) {
 
 ZMK_LISTENER(runtime_temp_layer, runtime_temp_layer_event_cb);
 ZMK_SUBSCRIPTION(runtime_temp_layer, zmk_layer_state_changed);
+
+/*
+ * Position events are only interesting to an instance that has an exclusion
+ * list, and that list stays in devicetree, so no instance can grow one later
+ * and this can be compiled out.
+ *
+ * The idle guard cannot be treated the same way, even though upstream does:
+ * require-prior-idle-ms is a runtime value now, so an instance that starts at
+ * zero can be given a real one from a client. A subscription compiled out on
+ * the devicetree value would leave that setting accepting edits and doing
+ * nothing. Runtime-ifying a value invalidates every #if that used to depend on
+ * it, which is the price of the move and worth paying once here.
+ */
+#define NEEDS_POSITIONS(n, ...) DT_INST_PROP_HAS_IDX(n, excluded_positions, 0)
+
+#if DT_INST_FOREACH_STATUS_OKAY_VARGS(NEEDS_POSITIONS, ||)
 ZMK_SUBSCRIPTION(runtime_temp_layer, zmk_position_state_changed);
+#endif
+
 ZMK_SUBSCRIPTION(runtime_temp_layer, zmk_keycode_state_changed);
 
 static int runtime_temp_layer_handle_event(const struct device *dev, struct input_event *event,
