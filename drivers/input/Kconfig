@@ -46,7 +46,11 @@ config ZMK_INPUT_PROCESSOR_RUNTIME_TEMP_LAYER
 
 config ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS
 	bool "Publish input processor parameters through zmk-feature-custom-settings"
-	depends on ZMK_CUSTOM_SETTINGS
+	# Not ZMK_CUSTOM_SETTINGS: registering a subsystem needs zmk/studio/custom.h,
+	# which includes ZMK's nanopb-generated proto/zmk/custom.pb.h. That is only
+	# generated when the Studio RPC is being built, so the base registry alone
+	# would let this be selected and then fail on a missing header.
+	depends on ZMK_CUSTOM_SETTINGS_STUDIO_RPC
 	help
 	  Registers this module's processor parameters in the cross-module custom
 	  settings registry, so a Studio client lists and edits them with no page
