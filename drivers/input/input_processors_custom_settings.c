@@ -49,9 +49,11 @@ static struct zmk_rpc_custom_subsystem_meta input_processors_meta = {
  * register the literal text "ZMK_INPUT_PROCESSORS_SUBSYSTEM_TOKEN". One
  * more layer of call expands it first.
  */
-#define REGISTER_SUBSYSTEM(identifier, meta, handler)                                                  ZMK_RPC_CUSTOM_SUBSYSTEM(identifier, meta, handler)
+#define REGISTER_SUBSYSTEM(identifier, meta, handler)                                              \
+    ZMK_RPC_CUSTOM_SUBSYSTEM(identifier, meta, handler)
 
-REGISTER_SUBSYSTEM(ZMK_INPUT_PROCESSORS_SUBSYSTEM_TOKEN, &input_processors_meta, input_processors_namespace_handler);
+REGISTER_SUBSYSTEM(ZMK_INPUT_PROCESSORS_SUBSYSTEM_TOKEN, &input_processors_meta,
+                   input_processors_namespace_handler);
 
 static bool input_processors_namespace_handler(const zmk_custom_CallRequest *request,
                                                pb_callback_t *encode_response) {
