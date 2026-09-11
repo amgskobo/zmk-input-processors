@@ -33,6 +33,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
  * a client sees is the plain positive one.
  */
 #define RUNTIME_CODE_MAPPER_SETTINGS(n)                                                            \
+    ZMK_INPUT_PROCESSORS_ASSERT_NAME_FITS(n, "enabled")                                            \
     ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
         runtime_code_mapper_cs_enabled_##n, ZMK_INPUT_PROCESSORS_SUBSYSTEM,                        \
         ZMK_INPUT_PROCESSORS_SETTING_KEY(n, "enabled"),                       \

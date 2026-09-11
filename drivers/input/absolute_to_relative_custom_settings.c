@@ -44,6 +44,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
  * label that hides a negation is worse than a long one.
  */
 #define ABSOLUTE_TO_RELATIVE_SETTINGS(n)                                                           \
+    ZMK_INPUT_PROCESSORS_ASSERT_NAME_FITS(n, "suppress_btn_touch")                                 \
     ABSOLUTE_TO_RELATIVE_SETTING(n, suppress_btn_touch, "suppress_btn_touch")                      \
     ABSOLUTE_TO_RELATIVE_SETTING(n, suppress_btn0, "suppress_btn0")
 

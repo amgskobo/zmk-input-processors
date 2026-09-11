@@ -46,3 +46,24 @@
  * fails loudly against at build time rather than silently truncating.
  */
 #define ZMK_INPUT_PROCESSORS_SETTING_KEY(n, field) DT_NODE_FULL_NAME(DT_DRV_INST(n)) "." field
+
+/*
+ * Fail by name when a node cannot fit a settings key.
+ *
+ * custom-settings already refuses a key over
+ * CONFIG_ZMK_CUSTOM_SETTINGS_KEY_MAX_LEN, but it can only say that some key
+ * was too long: the key is built inside its own macro, so the message names
+ * the settings file and not the devicetree node that caused it. Since the
+ * length is now the node's name plus the field, the node is the only thing
+ * anyone can act on, so it is worth asserting again to put it in the message.
+ *
+ * Pass the processor's longest field. The budget a node actually has is
+ * KEY_MAX_LEN minus that field and the dot -- 28 characters where the longest
+ * field is "suppress_btn_touch", and more for every other processor -- so
+ * checking the longest is checking all of them.
+ */
+#define ZMK_INPUT_PROCESSORS_ASSERT_NAME_FITS(n, longest_field)                                    \
+    BUILD_ASSERT(sizeof(ZMK_INPUT_PROCESSORS_SETTING_KEY(n, longest_field)) <=                     \
+                     CONFIG_ZMK_CUSTOM_SETTINGS_KEY_MAX_LEN,                                       \
+                 "devicetree node \"" DT_NODE_FULL_NAME(DT_DRV_INST(n))                            \
+                 "\" has a name too long to key its settings; shorten the node name");

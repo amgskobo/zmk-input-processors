@@ -39,6 +39,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
         ZMK_CUSTOM_SETTING_PERMISSION_SECURE, ZMK_CUSTOM_SETTING_NO_CONSTRAINT);
 
 #define RUNTIME_TRANSFORM_SETTINGS(n)                                                              \
+    ZMK_INPUT_PROCESSORS_ASSERT_NAME_FITS(n, "x_invert")                                           \
     RUNTIME_TRANSFORM_SETTING(n, xy_swap, "xy_swap")                                               \
     RUNTIME_TRANSFORM_SETTING(n, x_invert, "x_invert")                                             \
     RUNTIME_TRANSFORM_SETTING(n, y_invert, "y_invert")

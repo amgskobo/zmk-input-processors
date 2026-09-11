@@ -43,19 +43,6 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
         ZMK_CUSTOM_SETTING_PERMISSION_SECURE, __VA_ARGS__);
 
 /*
- * The layer is declared as a layer, not as a number in a range.
- *
- * A client that understands the constraint draws the keymap's own layer list,
- * so the row reads "MOUSE (3)" instead of "3" -- and a layer is the one value
- * here that a person cannot sanity-check by looking at it. The range is
- * declared alongside so a client that does not understand LAYER_ID still
- * refuses an impossible number rather than falling back to unbounded input.
- *
- * Neither is trusted: runtime_temp_layer_set_params() rejects a layer outside
- * the keymap regardless, because a constraint is a drawing hint that reaches
- * the client, not a rule the firmware is entitled to assume was obeyed.
- */
-/*
  * The switch that gives this stage a no-op.
  *
  * Every other processor here can be made to pass through by editing its own
@@ -74,7 +61,21 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
         ZMK_CUSTOM_SETTING_CONFIDENTIALITY_RPC_PUBLIC, ZMK_CUSTOM_SETTING_PERMISSION_UNSECURE,     \
         ZMK_CUSTOM_SETTING_PERMISSION_SECURE, ZMK_CUSTOM_SETTING_NO_CONSTRAINT);
 
+/*
+ * The layer is declared as a layer, not as a number in a range.
+ *
+ * A client that understands the constraint draws the keymap's own layer list,
+ * so the row reads "MOUSE (3)" instead of "3" -- and a layer is the one value
+ * here that a person cannot sanity-check by looking at it. The range is
+ * declared alongside so a client that does not understand LAYER_ID still
+ * refuses an impossible number rather than falling back to unbounded input.
+ *
+ * Neither is trusted: runtime_temp_layer_set_params() rejects a layer outside
+ * the keymap regardless, because a constraint is a drawing hint that reaches
+ * the client, not a rule the firmware is entitled to assume was obeyed.
+ */
 #define RUNTIME_TEMP_LAYER_SETTINGS(n)                                                             \
+    ZMK_INPUT_PROCESSORS_ASSERT_NAME_FITS(n, "prior_idle_ms")                                      \
     RUNTIME_TEMP_LAYER_ENABLED(n)                                                                  \
     RUNTIME_TEMP_LAYER_SETTING(n, layer, "layer", ZMK_CUSTOM_SETTING_LAYER_ID,                     \
                                ZMK_CUSTOM_SETTING_RANGE_INT32(0, ZMK_KEYMAP_LAYERS_LEN - 1))       \

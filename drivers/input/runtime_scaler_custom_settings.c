@@ -39,6 +39,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
         ZMK_CUSTOM_SETTING_RANGE_INT32(lo, RUNTIME_SCALER_PARAM_MAX));
 
 #define RUNTIME_SCALER_SETTINGS(n)                                                                 \
+    ZMK_INPUT_PROCESSORS_ASSERT_NAME_FITS(n, "multiplier")                                         \
     RUNTIME_SCALER_SETTING(n, multiplier, "multiplier", RUNTIME_SCALER_MULTIPLIER_MIN)             \
     RUNTIME_SCALER_SETTING(n, divisor, "divisor", RUNTIME_SCALER_DIVISOR_MIN)
 

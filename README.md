@@ -467,12 +467,41 @@ reads as the button being on where it means the button is being taken away.
 Nothing is abbreviated to save room that the 48-byte cap was not asking for,
 which is why `multiplier` is not `mul`.
 
-Length is not a style question here. A key is capped at 48 bytes and a name
-that overruns it fails the build; and an option label — which is how a client
-offers a node in a dropdown — is capped at 32 bytes including the terminator,
-where nothing fails and the name is simply truncated. A node whose name should
-be selectable therefore needs to stay under 31 characters. The names above run
-to 17.
+Length is not a style question here, and the budget belongs to the node,
+because the key is the node's name plus the longest field its processor
+publishes:
+
+| Processor | Longest field | Node name limit |
+| :--- | :--- | ---: |
+| absolute-to-relative | `suppress_btn_touch` | **28** |
+| runtime-temp-layer | `prior_idle_ms` | 33 |
+| vector-acceleration | `unity_speed` | 35 |
+| runtime-scaler | `multiplier` | 36 |
+| runtime-transform | `x_invert` | 38 |
+| runtime-code-mapper | `enabled` | 39 |
+
+An option label — how a client offers a node in a dropdown — is separately
+capped at 32 bytes including the terminator, and truncates silently rather than
+failing, so 31 is the ceiling wherever a node should be selectable. Every limit
+above except the first is looser than that, which makes 28 and 31 the two
+numbers worth remembering.
+
+Overrunning the key cap fails the build, and
+`ZMK_INPUT_PROCESSORS_ASSERT_NAME_FITS` makes it fail by name:
+
+```
+static assertion failed: "devicetree node "pointer_absolute_to_relative_far_too_long"
+has a name too long to key its settings; shorten the node name"
+```
+
+custom-settings asserts the same limit, but from inside its own macro, so it
+can only report that some key was too long. The node is the only thing anyone
+can act on.
+
+Abbreviate where the cap demands it or where the short form is the word people
+use — `abs_rel` is the first (the full name leaves a node three characters of
+room), `accel` and `xform` are the second. Do not abbreviate for room the cap
+is not asking for, which is why `multiplier` is not `mul`.
 
 A module's own dtsi singleton fixes the name it ships with. Where that name is
 too long or says the wrong thing, declare the node on the board instead of
