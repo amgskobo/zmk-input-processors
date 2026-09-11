@@ -71,6 +71,27 @@ west build -b <board> -s <app-dir>
 ```
 
 ## Usage
+
+### Module defaults
+
+Include `<zmk-input-processors/input_processor_runtime.dtsi>` to get these
+official-style, pass-through `zip_*` nodes. They use short node names for DYA
+settings and `/omit-if-no-ref/`, so they exist only when an input chain refers
+to them:
+
+| Reference label | Node name | Default scope |
+| :--- | :--- | :--- |
+| `zip_runtime_xy_scaler` | `zip_rt_xy_scale` | relative X/Y, 1/1 |
+| `zip_runtime_xy_transform` | `zip_rt_xy_xform` | relative X/Y, no transform |
+| `zip_runtime_pointer_scaler` | `zip_rt_ptr_scale` | relative X/Y, 1/1 |
+| `zip_runtime_scroll_scaler` | `zip_rt_scr_scale` | WHEEL/HWHEEL, 1/1 |
+| `zip_runtime_pointer_transform` | `zip_rt_ptr_xform` | relative X/Y, no transform |
+| `zip_runtime_scroll_transform` | `zip_rt_scr_xform` | WHEEL/HWHEEL, no transform |
+
+Code mapping needs an application-specific map, and temporary-layer processing
+needs an application-specific layer and timeout, so those remain explicit
+board DTS nodes rather than unsafe module defaults.
+
 ## Naming
 
 A processor whose name starts with `runtime` keeps its parameters in RAM and
@@ -411,7 +432,7 @@ Three things differ from upstream beyond the parameters:
 Every parameter in this module is published through
 [zmk-feature-custom-settings](https://github.com/cormoran/zmk-feature-custom-settings)
 when `CONFIG_ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS=y`. They appear under the
-`amgskobo__input_processors` subsystem in any Studio client that renders the
+`amgs_proc` subsystem in any Studio client that renders the
 custom settings list, with the declared type and range driving the widget, so
 this module ships no page and no protocol of its own.
 
@@ -451,24 +472,17 @@ reads as the button being on where it means the button is being taken away.
 Nothing is abbreviated to save room that the 48-byte cap was not asking for,
 which is why `multiplier` is not `mul`.
 
-Length is not a style question here, and the budget belongs to the node,
-because the key is the node's name plus the longest field its processor
-publishes:
-
-| Processor | Longest field | Node name limit |
-| :--- | :--- | ---: |
-| absolute-to-relative | `suppress_btn_touch` | **28** |
-| runtime-temp-layer | `prior_idle_ms` | 33 |
-| vector-acceleration | `unity_speed` | 35 |
-| runtime-scaler | `multiplier` | 36 |
-| runtime-transform | `x_invert` | 38 |
-| runtime-code-mapper | `enabled` | 39 |
+Length is not a style question here. A DYA configuration that combines these
+processors with absolute-to-relative keeps every settings node at **19
+characters or fewer**. Use a short route plus role, such as `scroll_abs_rel`,
+`pointer_scale`, or `stick_accel`; keep the reference label descriptive. This
+fits the strictest persisted-name budget, while each module also asserts its
+own key and storage-name limits at build time.
 
 An option label — how a client offers a node in a dropdown — is separately
-capped at 32 bytes including the terminator, and truncates silently rather than
-failing, so 31 is the ceiling wherever a node should be selectable. Every limit
-above except the first is looser than that, which makes 28 and 31 the two
-numbers worth remembering.
+capped at 32 bytes including the terminator and truncates silently. The
+19-character node rule is therefore both the safe persistence limit and safely
+inside the selectable-label limit.
 
 Overrunning the key cap fails the build, and
 `ZMK_INPUT_PROCESSORS_ASSERT_NAME_FITS` makes it fail by name:
@@ -482,10 +496,10 @@ custom-settings asserts the same limit, but from inside its own macro, so it
 can only report that some key was too long. The node is the only thing anyone
 can act on.
 
-Abbreviate where the cap demands it or where the short form is the word people
-use — `abs_rel` is the first (the full name leaves a node three characters of
-room), `accel` and `xform` are the second. Do not abbreviate for room the cap
-is not asking for, which is why `multiplier` is not `mul`.
+Abbreviate only the node name where the budget demands it: `abs_rel`, `accel`,
+and `xform` are conventional short forms. Keep the setting field names and
+reference labels descriptive; they are not the part a board author needs to
+spend to make instances distinguishable.
 
 A module's own dtsi singleton fixes the name it ships with. Where that name is
 too long or says the wrong thing, declare the node on the board instead of

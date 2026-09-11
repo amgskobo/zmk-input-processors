@@ -41,8 +41,17 @@ static struct zmk_rpc_custom_subsystem_meta input_processors_meta = {
     .security = ZMK_STUDIO_RPC_HANDLER_UNSECURED,
 };
 
-ZMK_RPC_CUSTOM_SUBSYSTEM(amgskobo__input_processors, &input_processors_meta,
-                         input_processors_namespace_handler);
+/*
+ * Through a wrapper so the token expands before it is stringified.
+ *
+ * ZMK_RPC_CUSTOM_SUBSYSTEM registers `#_identifier`, and `#` suppresses
+ * expansion of its own argument, so passing the macro straight in would
+ * register the literal text "ZMK_INPUT_PROCESSORS_SUBSYSTEM_TOKEN". One
+ * more layer of call expands it first.
+ */
+#define REGISTER_SUBSYSTEM(identifier, meta, handler)                                                  ZMK_RPC_CUSTOM_SUBSYSTEM(identifier, meta, handler)
+
+REGISTER_SUBSYSTEM(ZMK_INPUT_PROCESSORS_SUBSYSTEM_TOKEN, &input_processors_meta, input_processors_namespace_handler);
 
 static bool input_processors_namespace_handler(const zmk_custom_CallRequest *request,
                                                pb_callback_t *encode_response) {

@@ -1,0 +1,65 @@
+/*
+ * Ready-to-reference runtime input processors.
+ *
+ * The label is deliberately stable for input chains; the short node name is
+ * the custom-settings key prefix when DYA settings are enabled. Nodes are
+ * omitted unless a board references them, so including this file is harmless.
+ */
+
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    zip_runtime_xy_scaler: /omit-if-no-ref/ zip_rt_xy_scale {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        type = <INPUT_EV_REL>;
+        codes = <INPUT_REL_X>, <INPUT_REL_Y>;
+        multiplier = <1>;
+        divisor = <1>;
+        track-remainders;
+    };
+
+    zip_runtime_xy_transform: /omit-if-no-ref/ zip_rt_xy_xform {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        type = <INPUT_EV_REL>;
+        x-codes = <INPUT_REL_X>;
+        y-codes = <INPUT_REL_Y>;
+    };
+
+    zip_runtime_pointer_scaler: /omit-if-no-ref/ zip_rt_ptr_scale {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        type = <INPUT_EV_REL>;
+        codes = <INPUT_REL_X>, <INPUT_REL_Y>;
+        multiplier = <1>;
+        divisor = <1>;
+        track-remainders;
+    };
+
+    zip_runtime_scroll_scaler: /omit-if-no-ref/ zip_rt_scr_scale {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        type = <INPUT_EV_REL>;
+        codes = <INPUT_REL_WHEEL>, <INPUT_REL_HWHEEL>;
+        multiplier = <1>;
+        divisor = <1>;
+        track-remainders;
+    };
+
+    zip_runtime_pointer_transform: /omit-if-no-ref/ zip_rt_ptr_xform {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        type = <INPUT_EV_REL>;
+        x-codes = <INPUT_REL_X>;
+        y-codes = <INPUT_REL_Y>;
+    };
+
+    zip_runtime_scroll_transform: /omit-if-no-ref/ zip_rt_scr_xform {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        type = <INPUT_EV_REL>;
+        x-codes = <INPUT_REL_HWHEEL>;
+        y-codes = <INPUT_REL_WHEEL>;
+    };
+};
