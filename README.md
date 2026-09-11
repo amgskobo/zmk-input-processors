@@ -427,7 +427,7 @@ Three things differ from upstream beyond the parameters:
 Every parameter in this module is published through
 [zmk-feature-custom-settings](https://github.com/cormoran/zmk-feature-custom-settings)
 when `CONFIG_ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS=y`. They appear under the
-`amgskobo__runtime_processors` subsystem in any Studio client that renders the
+`amgskobo__input_processors` subsystem in any Studio client that renders the
 custom settings list, with the declared type and range driving the widget, so
 this module ships no page and no protocol of its own.
 

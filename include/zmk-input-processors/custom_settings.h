@@ -9,6 +9,13 @@
  * renders by subsystem. Every parameter in this module therefore arrives in a
  * client under one heading, and adding a processor adds settings to it rather
  * than another heading with one row in it.
+ *
+ * It is named for the module, not for the runtime prefix its processors carry.
+ * The two say different things -- runtime is a property of a processor, that
+ * its parameters live in RAM, while this is the registry those parameters are
+ * published through -- and absolute-to-relative publishes here while
+ * deliberately not carrying the prefix, so a heading named after it would
+ * exclude one of its own rows.
  */
 
 #pragma once
@@ -16,7 +23,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/sys/util.h>
 
-#define ZMK_INPUT_PROCESSORS_SUBSYSTEM "amgskobo__runtime_processors"
+#define ZMK_INPUT_PROCESSORS_SUBSYSTEM "amgskobo__input_processors"
 
 /*
  * A setting key is the owning node's devicetree name, then the field:
