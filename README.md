@@ -1,10 +1,28 @@
 # ZMK Input Processors
 
-A Zephyr module that provides input processors for ZMK (Zephyr Mechanical Keyboard) firmware. Input processors are drivers that transform or filter input events from pointing devices (mice, trackpads, etc.).
+Runtime-configurable versions of ZMK's standard input processors.
+
+ZMK ships five — scaler, transform, code-mapper, temp-layer, behaviors — and
+each builds its parameters into flash from devicetree, so changing a pointer's
+speed or a pad's orientation means a rebuild. These four are the same
+processors with those parameters in RAM, named `runtime-*` so a chain shows at
+a glance which stages can be changed while the keyboard runs.
+
+They need nothing but upstream ZMK. The runtime *access* is what needs more:
+ZMK has no protocol for reaching a processor's parameters, so that half is
+separated into files compiled only when
+[zmk-feature-custom-settings](https://github.com/cormoran/zmk-feature-custom-settings)
+is present. Without it the processors still build and run, on the devicetree
+values, fixed.
+
+Originals live elsewhere, one module each —
+[abs2rel](https://github.com/amgskobo/zmk-input-abs2rel),
+[vector-acceleration](https://github.com/amgskobo/zmk-input-vector-acceleration),
+[inertia](https://github.com/amgskobo/zmk-input-inertia),
+[padstick](https://github.com/amgskobo/zmk-input-padstick).
 
 ## Features
 
-- **Absolute to Relative Processor** — Converts absolute pointer coordinates into relative motion, smoothed over two samples, with runtime button suppression
 - **Runtime Scaler** — Scales pointer events by a ratio held on the node, in 64-bit arithmetic
 - **Runtime Transform** — Swaps and inverts axes from three flags held on the node
 - **Runtime Code Mapper** — Rewrites event codes, with a switch that turns the map off
@@ -53,51 +71,6 @@ west build -b <board> -s <app-dir>
 ```
 
 ## Usage
-### include input_processor_absolute_to_relative.dtsi
-```dts
-// Absolute converter include
-#include <behaviors/input_processor_absolute_to_relative.dtsi>
-```
-### Enable the Absolute to Relative Processor
-
-In your keyboard's device tree file (`.keymap` or DTS), enable the processor:
-
-```dts
-/* Assign to Listener */
-&trackpad_listener {
-    input-processors = <&zip_absolute_to_relative>;
-};
-```
-
-Then wire it into your input handler chain according to your ZMK configuration.
-
-**Smoothing Behavior**: Movement data is smoothed by averaging the current delta with the previous delta: `smooth_delta = (current_delta + previous_delta) / 2`. The halving divides rather than shifting, because a shift rounds towards minus infinity and would make the same path measure longer travelled one way than the other. The first sample on each axis establishes the reference point and produces no event; smoothing begins on the second.
-
-**Reference point**: `BTN_TOUCH` drops the reference point on both edges, and so does a layer change. Absolute events are converted whenever they arrive, without checking whether a contact is believed to be active - an instance only sees the part of a contact during which it holds the chain, so believing otherwise would silence it for the rest of a contact that began elsewhere.
-
-### Configuration Reference
-
-| Property | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `suppress-btn-touch` | bool | false | Consume `INPUT_BTN_TOUCH` after using it to drop the reference point, so it does not reach the mouse HID as a button press. |
-| `suppress-btn0` | bool | false | Consume `INPUT_BTN_0` when the trackpad reports a physical click. |
-
-Both suppression flags are runtime values — they decide whether a pad's
-physical click reaches the host at all, which is the kind of thing that wants
-trying rather than deciding. On a pad that also carries tap-to-click, one
-setting is a duplicate button and the other is a missing one, and which is
-which depends on the pad. Turning `suppress-btn0` off does not release a press
-already swallowed: that press's release still passes through, for the same
-reason it does across a layer change.
-
-### Layer Changes
-
-Which processors run is decided per event, from the layer active at that moment, so one contact can be split across two chains. The instance a contact moves to would otherwise still hold a reference point taken from an earlier touch, and turn its first sample into the distance between two unrelated contacts - a jump across the pad produced by a single count of real motion.
-
-`zmk_layer_state_changed` is therefore subscribed directly, and a layer change drops the reference point. The next sample re-establishes it, exactly as at touch-down.
-
-`suppress-btn0` never drops a `BTN_0` release whose press was not suppressed here. Passing a release through is always safe - the press it belongs to already reached the host - while dropping one would leave the button held down with nothing left to release it. That record is cleared on a layer change too.
-
 ## Naming
 
 A processor whose name starts with `runtime` keeps its parameters in RAM and
@@ -122,11 +95,12 @@ moment the chain is edited.
 So every runtime processor declares `#input-processor-cells = <0>` and carries
 its parameters as properties instead. A chain entry takes no numbers.
 
-`zmk,input-processor-absolute-to-relative` is the exception: it takes runtime
-parameters but keeps its plain name. The prefix exists to tell a live processor
-apart from the fixed upstream one it replaces, and this processor has no
-upstream counterpart to be confused with — so the prefix would carry no
-information, while the rename would break every configuration already using it.
+Every processor here carries the prefix, because every one of them replaces a
+fixed upstream processor. One did not — absolute-to-relative, an original with
+no upstream counterpart — and it was documented as an exception until the
+exception was recognised as the symptom: it now lives in
+[its own module](https://github.com/amgskobo/zmk-input-abs2rel), with the other
+originals.
 
 ### What moving the parameters costs
 
@@ -173,8 +147,8 @@ It buys reordering too, in the form that matters. Put the same kind of stage at
 two positions and move the value between them:
 
 ```dts
-input-processors = <&zip_absolute_to_relative>,
-                   <&pointer_scale_pre>,   /* 1/1 — before the curve */
+input-processors = <&zip_absolute_to_relative>,  /* zmk-input-abs2rel */
+                   <&pointer_scale_pre>,         /* 1/1 — before the curve */
                    <&vector_accel>,
                    <&pointer_scale>;       /* 889/500 — after it */
 ```
@@ -253,6 +227,7 @@ listed, and changed at runtime.
 };
 
 &trackpad_listener {
+    /* &zip_absolute_to_relative comes from zmk-input-abs2rel. */
     input-processors = <&zip_absolute_to_relative>, <&pointer_scale>;
 };
 ```
@@ -529,8 +504,8 @@ first match — so the module checks once at startup and logs
 Two costs are worth knowing. Renaming a node orphans its stored value, though
 a rename is a firmware change and needs a reflash anyway. And keys are as long
 as the node names, against a 48-byte cap: the longest this keyboard produces is
-`zip_absolute_to_relative_no_btn0.btn_touch` at 42 bytes, and a name that does
-not fit fails the build loudly rather than truncating.
+`runtime_temp_layer.prior_idle_ms` at 32 bytes, and a name that does not fit
+fails the build loudly rather than truncating.
 
 The registry also owns persistence. The drivers store nothing themselves, which
 is what keeps a value from having two owners that can disagree after a reboot.
@@ -559,7 +534,6 @@ The option needs `zmk-feature-custom-settings`, and so the patched ZMK that
 carries the custom Studio RPC protocol. Processors can also be driven from C
 directly — see `include/zmk-input-processors/runtime_scaler.h`.
 
-
 ## Project Structure
 
 ```
@@ -572,13 +546,11 @@ directly — see `include/zmk-input-processors/runtime_scaler.h`.
 │   └── input/
 │       ├── CMakeLists.txt            # Input drivers build config
 │       ├── Kconfig                   # Input drivers Kconfig
-│       ├── input_processor_absolute_to_relative.c
 │       ├── input_processor_runtime_scaler.c
 │       ├── input_processor_runtime_transform.c
 │       ├── input_processor_runtime_code_mapper.c
 │       ├── input_processor_runtime_temp_layer.c
 │       ├── input_processors_custom_settings.c  # shared settings namespace
-│       ├── absolute_to_relative_custom_settings.c
 │       ├── runtime_scaler_custom_settings.c
 │       ├── runtime_transform_custom_settings.c
 │       ├── runtime_code_mapper_custom_settings.c
@@ -586,10 +558,7 @@ directly — see `include/zmk-input-processors/runtime_scaler.h`.
 ├── include/
 │   └── zmk-input-processors/       # runtime APIs and the settings namespace
 ├── dts/
-│   ├── behaviors/
-│   │   └── input_processor_absolute_to_relative.dtsi
 │   └── bindings/
-│       ├── zmk,input-processor-absolute-to-relative.yaml
 │       ├── zmk,input-processor-runtime-scaler.yaml
 │       ├── zmk,input-processor-runtime-transform.yaml
 │       ├── zmk,input-processor-runtime-code-mapper.yaml
@@ -669,7 +638,7 @@ See [.github/copilot-instructions.md](.github/copilot-instructions.md) for detai
 - **Multi-instance callbacks**: Use `CONTAINER_OF()` to retrieve driver state from work struct (not `DEVICE_DT_INST_GET(0)`)
 - **Logging**: Use `LOG_MODULE_REGISTER(name, CONFIG_ZMK_LOG_LEVEL)` and `LOG_INF()` for debugging
 
-See [drivers/input/input_processor_absolute_to_relative.c](drivers/input/input_processor_absolute_to_relative.c) for a complete reference implementation.
+See [drivers/input/input_processor_runtime_scaler.c](drivers/input/input_processor_runtime_scaler.c) for a complete reference implementation, and its `*_custom_settings.c` beside it for how a parameter is published.
 
 ## License
 

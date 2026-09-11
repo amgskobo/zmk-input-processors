@@ -1,15 +1,6 @@
 # Copyright (c) 2022 The ZMK Contributors
 # SPDX-License-Identifier: MIT
 
-DT_COMPAT_ZMK_INPUT_PROCESSOR_ABSOLUTE_TO_RELATIVE := zmk,input-processor-absolute-to-relative
-
-config ZMK_INPUT_PROCESSOR_ABSOLUTE_TO_RELATIVE
-		bool
-		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_ABSOLUTE_TO_RELATIVE))
-		depends on ZMK_POINTING
-        depends on (!ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL)
-
-
 # The runtime processors. Each one keeps the parameters its upstream
 # counterpart holds in rodata in RAM instead, and names them on the node, so
 # they can be listed and changed while the keyboard runs. Selected by the
