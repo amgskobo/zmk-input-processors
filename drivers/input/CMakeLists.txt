@@ -23,18 +23,18 @@ if (CONFIG_ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS)
     target_sources(app PRIVATE input_processors_custom_settings.c)
 
     if (CONFIG_ZMK_INPUT_PROCESSOR_RUNTIME_SCALER)
-        target_sources(app PRIVATE runtime_scaler_custom_settings.c)
+        target_sources(app PRIVATE input_processor_runtime_scaler_custom_settings.c)
     endif()
 
     if (CONFIG_ZMK_INPUT_PROCESSOR_RUNTIME_TRANSFORM)
-        target_sources(app PRIVATE runtime_transform_custom_settings.c)
+        target_sources(app PRIVATE input_processor_runtime_transform_custom_settings.c)
     endif()
 
     if (CONFIG_ZMK_INPUT_PROCESSOR_RUNTIME_CODE_MAPPER)
-        target_sources(app PRIVATE runtime_code_mapper_custom_settings.c)
+        target_sources(app PRIVATE input_processor_runtime_code_mapper_custom_settings.c)
     endif()
 
     if (CONFIG_ZMK_INPUT_PROCESSOR_RUNTIME_TEMP_LAYER)
-        target_sources(app PRIVATE runtime_temp_layer_custom_settings.c)
+        target_sources(app PRIVATE input_processor_runtime_temp_layer_custom_settings.c)
     endif()
 endif()

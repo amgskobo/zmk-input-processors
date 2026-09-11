@@ -544,17 +544,17 @@ directly — see `include/zmk-input-processors/runtime_scaler.h`.
 │   ├── CMakeLists.txt
 │   ├── Kconfig
 │   └── input/
-│       ├── CMakeLists.txt            # Input drivers build config
-│       ├── Kconfig                   # Input drivers Kconfig
-│       ├── input_processor_runtime_scaler.c
-│       ├── input_processor_runtime_transform.c
+│       ├── CMakeLists.txt
+│       ├── Kconfig
 │       ├── input_processor_runtime_code_mapper.c
+│       ├── input_processor_runtime_code_mapper_custom_settings.c
+│       ├── input_processor_runtime_scaler.c
+│       ├── input_processor_runtime_scaler_custom_settings.c
 │       ├── input_processor_runtime_temp_layer.c
-│       ├── input_processors_custom_settings.c  # shared settings namespace
-│       ├── runtime_scaler_custom_settings.c
-│       ├── runtime_transform_custom_settings.c
-│       ├── runtime_code_mapper_custom_settings.c
-│       └── runtime_temp_layer_custom_settings.c
+│       ├── input_processor_runtime_temp_layer_custom_settings.c
+│       ├── input_processor_runtime_transform.c
+│       ├── input_processor_runtime_transform_custom_settings.c
+│       └── input_processors_custom_settings.c   # the module's namespace
 ├── include/
 │   └── zmk-input-processors/       # runtime APIs and the settings namespace
 ├── dts/
