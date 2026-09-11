@@ -12,8 +12,13 @@
  *
  * Nothing here is a protocol: the values are read and written through
  * custom-settings' own RPC, which is what lets these processors appear in a
- * client that has no page for them. The advertised UI is the custom settings
- * editor.
+ * client that has no page for them.
+ *
+ * The advertised URL is this module's own documentation, which is the only
+ * thing that explains what these settings do. A client shows it on the card
+ * for a subsystem it does not recognise, and DYA Studio disconnects before
+ * following it -- so pointing it at somebody else's page, as this did, sends
+ * a reader away from their keyboard to a document about a different thing.
  */
 
 #include <string.h>
@@ -32,7 +37,7 @@ static bool input_processors_namespace_handler(const zmk_custom_CallRequest *req
                                                pb_callback_t *encode_response);
 
 static struct zmk_rpc_custom_subsystem_meta input_processors_meta = {
-    ZMK_RPC_CUSTOM_SUBSYSTEM_UI_URLS("https://cormoran.github.io/zmk-feature-custom-settings/"),
+    ZMK_RPC_CUSTOM_SUBSYSTEM_UI_URLS("https://github.com/amgskobo/zmk-input-processors"),
     .security = ZMK_STUDIO_RPC_HANDLER_UNSECURED,
 };
 

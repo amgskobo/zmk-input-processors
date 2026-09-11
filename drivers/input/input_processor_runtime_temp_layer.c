@@ -69,7 +69,25 @@ struct runtime_temp_layer_data {
     struct k_work_delayable deactivate_work;
 };
 
-/* Caller holds the lock. */
+/*
+ * Caller holds the lock.
+ *
+ * is_active is written before the call and corrected after it, and both halves
+ * matter.
+ *
+ * Before, because ZMK raises zmk_layer_state_changed synchronously from inside
+ * zmk_keymap_layer_activate, and this processor listens for it: the handler
+ * runs on this thread, inside this function, and re-takes this mutex (Zephyr
+ * mutexes are recursive for the owning thread). Finding is_active already
+ * equal to what the keymap now says is what makes it a no-op instead of an
+ * immediate undo. ZMK writes the layer bit before raising, so the two agree.
+ *
+ * After, because the keymap can refuse. A non-forcing deactivate does nothing
+ * to a locked layer, and set_layer_state() returns 0 either way, so asking is
+ * the only way to find out. Believing the request instead would leave this
+ * processor thinking it had dropped a layer that is still up, with nothing
+ * left that would ever drop it.
+ */
 static void set_layer_locked(struct runtime_temp_layer_data *data, bool activate) {
     if (data->is_active == activate) {
         return;
@@ -79,11 +97,14 @@ static void set_layer_locked(struct runtime_temp_layer_data *data, bool activate
 
     if (activate) {
         zmk_keymap_layer_activate(data->active_layer, false);
-        LOG_DBG("%s: layer %d raised", data->dev->name, data->active_layer);
     } else {
         zmk_keymap_layer_deactivate(data->active_layer, false);
-        LOG_DBG("%s: layer %d dropped", data->dev->name, data->active_layer);
     }
+
+    data->is_active = zmk_keymap_layer_active(data->active_layer);
+
+    LOG_DBG("%s: layer %d %s", data->dev->name, data->active_layer,
+            data->is_active ? "raised" : "dropped");
 }
 
 /*
