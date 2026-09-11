@@ -5,6 +5,15 @@
 # counterpart holds in rodata in RAM instead, and names them on the node, so
 # they can be listed and changed while the keyboard runs. Selected by the
 # devicetree, so a board that declares no such node compiles none of them.
+#
+# RUNTIME is not redundant with the module name, however much it looks it.
+# Upstream already owns ZMK_INPUT_PROCESSOR_SCALER, _TRANSFORM, _CODE_MAPPER
+# and _TEMP_LAYER, and Kconfig merges two definitions of one symbol rather
+# than refusing them: dropping RUNTIME here makes declaring one of these nodes
+# also enable upstream's driver, which then compiles into the image with no
+# instances. The build succeeds. The only sign is an unused-variable warning
+# in a ZMK source file. The compatible strings cannot drop it either, for the
+# louder reason that two bindings sharing a compatible is a hard error.
 
 DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_SCALER := zmk,input-processor-runtime-scaler
 

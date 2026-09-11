@@ -95,6 +95,15 @@ moment the chain is edited.
 So every runtime processor declares `#input-processor-cells = <0>` and carries
 its parameters as properties instead. A chain entry takes no numbers.
 
+The prefix looks redundant with the module name and is not. Upstream owns
+`ZMK_INPUT_PROCESSOR_SCALER`, `_TRANSFORM`, `_CODE_MAPPER` and `_TEMP_LAYER`,
+and Kconfig merges two definitions of one symbol rather than refusing them —
+so dropping `RUNTIME` makes declaring one of these nodes *also* enable
+upstream's driver, which compiles into the image with no instances. The build
+succeeds; the only sign is an unused-variable warning in a ZMK file. The
+compatible strings cannot drop it either, for the louder reason that two
+bindings sharing a compatible is a hard error.
+
 Every processor here carries the prefix, because every one of them replaces a
 fixed upstream processor. One did not — absolute-to-relative, an original with
 no upstream counterpart — and it was documented as an exception until the
