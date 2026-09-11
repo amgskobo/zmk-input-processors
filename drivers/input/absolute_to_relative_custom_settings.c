@@ -37,9 +37,15 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
         ZMK_CUSTOM_SETTING_CONFIDENTIALITY_RPC_PUBLIC, ZMK_CUSTOM_SETTING_PERMISSION_UNSECURE,     \
         ZMK_CUSTOM_SETTING_PERMISSION_SECURE, ZMK_CUSTOM_SETTING_NO_CONSTRAINT);
 
+/*
+ * The key keeps the "suppress" that the devicetree property carries. Dropped,
+ * the row reads btn0 = true where the value means the button is being taken
+ * away, and a client has nothing to show that from: a key is the label, and a
+ * label that hides a negation is worse than a long one.
+ */
 #define ABSOLUTE_TO_RELATIVE_SETTINGS(n)                                                           \
-    ABSOLUTE_TO_RELATIVE_SETTING(n, suppress_btn_touch, "btn_touch")                               \
-    ABSOLUTE_TO_RELATIVE_SETTING(n, suppress_btn0, "btn0")
+    ABSOLUTE_TO_RELATIVE_SETTING(n, suppress_btn_touch, "suppress_btn_touch")                      \
+    ABSOLUTE_TO_RELATIVE_SETTING(n, suppress_btn0, "suppress_btn0")
 
 DT_INST_FOREACH_STATUS_OKAY(ABSOLUTE_TO_RELATIVE_SETTINGS)
 

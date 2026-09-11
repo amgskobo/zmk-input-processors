@@ -434,12 +434,12 @@ this module ships no page and no protocol of its own.
 A key is the owning node's devicetree name, then the field:
 
 ```
-pointer_scale.mul
-pointer_scale.div
-scroll_scale.mul
-scroll_scale.div
-slider_scale_h.mul
-slider_scale_h.div
+pointer_scale.multiplier
+pointer_scale.divisor
+scroll_scale.multiplier
+scroll_scale.divisor
+scroll_slider_scale_h.multiplier
+scroll_slider_scale_h.divisor
 ```
 
 **So name nodes as though they were keys, because they are.** A name is what a
@@ -448,11 +448,24 @@ client shows, what a person searches for, and the prefix a chain view joins on.
 short:
 
 ```
-pointer_abs_rel   pointer_xform   pointer_scale_pre   pointer_accel
-pointer_scale     pointer_layer   stick_xform         stick_accel
-scroll_abs_rel    scroll_xform    scroll_scale        scroll_map
-pad_scale_v       pad_scale_h     slider_scale_v      slider_scale_h
+pointer_abs_rel   pointer_xform         pointer_scale_pre      pointer_accel
+pointer_scale     pointer_layer         stick_xform            stick_accel
+scroll_abs_rel    scroll_xform          scroll_scale           scroll_map
+scroll_pad_scale_v  scroll_pad_scale_h  scroll_slider_scale_v  scroll_slider_scale_h
 ```
+
+Nest rather than shorten when a route has sub-routes. The two scroll routes
+were first called `pad_` and `slider_`, which put their stages three places
+apart from the `scroll_` stages they share, in the sorted list the route prefix
+exists to group. `pad_` was also one letter from `padstick`.
+
+**The field is named for what the value means, not for how the devicetree
+property is spelt.** A key is the label a client draws, so `start-disabled`
+becomes `enabled` rather than carrying a negation into the UI, and
+`suppress-btn0` stays `suppress_btn0` rather than losing one: `btn0 = true`
+reads as the button being on where it means the button is being taken away.
+Nothing is abbreviated to save room that the 48-byte cap was not asking for,
+which is why `multiplier` is not `mul`.
 
 Length is not a style question here. A key is capped at 48 bytes and a name
 that overruns it fails the build; and an option label — which is how a client
