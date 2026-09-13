@@ -1,0 +1,15 @@
+config ZMK_INPUT_PROCESSORS_TEST_DRIVERS
+    bool "Run the runtime processor driver self-tests at boot"
+    depends on ZMK_POINTING
+
+config ZMK_INPUT_PROCESSORS_TEST_SETTINGS
+    bool "Run the runtime processor settings self-tests at boot"
+    depends on ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS
+
+config ZMK_INPUT_PROCESSORS_TEST_DEFAULTS
+    bool "Check the module's ready-made nodes against their documented defaults at boot"
+    depends on ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS
+
+config ZMK_INPUT_PROCESSORS_TEST_PERSISTENCE
+    bool "Store settings on the first boot and check they are applied on the second"
+    depends on ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS && SETTINGS_NVS

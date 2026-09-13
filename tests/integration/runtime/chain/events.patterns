@@ -1,0 +1,3 @@
+s/.*hid_mouse_//p
+s/.*set_layer_state: //p
+s/.*set_layer_locked: //p

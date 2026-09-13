@@ -1,0 +1,16 @@
+if SHIELD_RUNTIME_PROCESSORS_SPLIT_LEFT
+
+config ZMK_KEYBOARD_NAME
+    default "RT Split Test"
+
+config ZMK_SPLIT_ROLE_CENTRAL
+    default y
+
+endif
+
+if SHIELD_RUNTIME_PROCESSORS_SPLIT_LEFT || SHIELD_RUNTIME_PROCESSORS_SPLIT_RIGHT
+
+config ZMK_SPLIT
+    default y
+
+endif

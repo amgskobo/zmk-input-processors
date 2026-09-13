@@ -1,0 +1,7 @@
+/* The central half runs the listener, and so the processors. */
+
+#include "runtime_processors_split.dtsi"
+
+&split_listener {
+    status = "okay";
+};

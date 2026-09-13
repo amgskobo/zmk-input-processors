@@ -25,7 +25,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <zephyr/device.h>
+struct device;
+
+/* One minute is the published upper bound for both runtime timers. */
+#define RUNTIME_TEMP_LAYER_MAX_MS 60000U
 
 struct runtime_temp_layer_params {
     /*
@@ -60,8 +63,7 @@ struct runtime_temp_layer_params {
 };
 
 /* Reads the parameters the processor is applying right now. */
-int runtime_temp_layer_get_params(const struct device *dev,
-                                  struct runtime_temp_layer_params *out);
+int runtime_temp_layer_get_params(const struct device *dev, struct runtime_temp_layer_params *out);
 
 /*
  * Applies new parameters. Returns -EINVAL and changes nothing when the layer
@@ -73,6 +75,10 @@ int runtime_temp_layer_get_params(const struct device *dev,
  * live layer would mean deactivating one and activating another from whichever
  * thread happened to write the setting, which is a worse failure than one
  * stale activation.
+ *
+ * Changing the timeout while a layer is raised restarts it from the update;
+ * changing it to zero cancels the pending timeout. A queued activation from
+ * before any parameter update is discarded and needs a new input event.
  *
  * Switching enabled off is the exception, and drops a held layer instead of
  * waiting: a layer left up by a processor that has been turned off has nothing

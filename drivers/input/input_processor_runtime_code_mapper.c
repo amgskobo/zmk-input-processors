@@ -18,10 +18,12 @@
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/atomic.h>
 
 #include <drivers/input_processor.h>
 
 #include <zmk-input-processors/runtime_code_mapper.h>
+#include <zmk-input-processors/runtime_code_mapper_math.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -33,7 +35,7 @@ struct runtime_code_mapper_config {
 };
 
 struct runtime_code_mapper_data {
-    bool enabled;
+    atomic_t enabled;
 };
 
 int runtime_code_mapper_get_enabled(const struct device *dev, bool *out) {
@@ -41,9 +43,9 @@ int runtime_code_mapper_get_enabled(const struct device *dev, bool *out) {
         return -EINVAL;
     }
 
-    const struct runtime_code_mapper_data *data = dev->data;
+    struct runtime_code_mapper_data *data = dev->data;
 
-    *out = data->enabled;
+    *out = atomic_get(&data->enabled) != 0;
 
     return 0;
 }
@@ -55,7 +57,7 @@ int runtime_code_mapper_set_enabled(const struct device *dev, bool enabled) {
 
     struct runtime_code_mapper_data *data = dev->data;
 
-    data->enabled = enabled;
+    atomic_set(&data->enabled, enabled ? 1 : 0);
 
     LOG_DBG("%s: map %s", dev->name, enabled ? "on" : "off");
 
@@ -71,23 +73,16 @@ static int runtime_code_mapper_handle_event(const struct device *dev, struct inp
     ARG_UNUSED(state);
 
     const struct runtime_code_mapper_config *config = dev->config;
-    const struct runtime_code_mapper_data *data = dev->data;
+    struct runtime_code_mapper_data *data = dev->data;
 
-    /* One bool, so it is read whole: no lock is needed the way it is for a
-     * ratio or a set of orientation flags. */
-    if (!data->enabled || event->type != config->type) {
+    if (atomic_get(&data->enabled) == 0 || event->type != config->type) {
         return ZMK_INPUT_PROC_CONTINUE;
     }
 
-    for (size_t i = 0; i < config->pairs; i++) {
-        if (config->map[i * 2] == event->code) {
-            const uint16_t original = event->code;
-
-            event->code = config->map[(i * 2) + 1];
-
-            LOG_DBG("Remapped %d to %d", original, event->code);
-            break;
-        }
+    const uint16_t original = event->code;
+    runtime_code_mapper_apply(&event->code, config->map, config->pairs, true);
+    if (event->code != original) {
+        LOG_DBG("Remapped %d to %d", original, event->code);
     }
 
     return ZMK_INPUT_PROC_CONTINUE;
@@ -97,7 +92,7 @@ static int runtime_code_mapper_init(const struct device *dev) {
     const struct runtime_code_mapper_config *config = dev->config;
     struct runtime_code_mapper_data *data = dev->data;
 
-    data->enabled = config->start_enabled;
+    atomic_set(&data->enabled, config->start_enabled ? 1 : 0);
 
     return 0;
 }

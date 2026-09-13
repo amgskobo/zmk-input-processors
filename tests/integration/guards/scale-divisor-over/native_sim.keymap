@@ -1,0 +1,13 @@
+/* One past the divisor ceiling. */
+
+#include "../values.dtsi"
+
+/ {
+    scale_divisor_over {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <INPUT_REL_X>;
+        multiplier = <1>;
+        divisor = <32768>;
+    };
+};

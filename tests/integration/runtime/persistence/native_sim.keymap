@@ -1,0 +1,81 @@
+/*
+ * One instance of each processor with its settings stored in flash, for the
+ * persistence self-test. The case boots twice against one flash file.
+ */
+
+#include <behaviors.dtsi>
+#include <physical_layouts.dtsi>
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/kscan_mock.h>
+#include <dt-bindings/zmk/matrix_transform.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    physical_layout {
+        compatible = "zmk,physical-layout";
+        display-name = "Test";
+        transform = <&transform>;
+        keys = <&key_physical_attrs 100 100 0 0 0 0 0>,
+               <&key_physical_attrs 100 100 100 0 0 0 0>,
+               <&key_physical_attrs 100 100 0 100 0 0 0>,
+               <&key_physical_attrs 100 100 100 100 0 0 0>;
+    };
+
+    transform: transform {
+        compatible = "zmk,matrix-transform";
+        rows = <2>;
+        columns = <2>;
+        map = <RC(0,0) RC(0,1) RC(1,0) RC(1,1)>;
+    };
+
+    keymap {
+        compatible = "zmk,keymap";
+
+        base {
+            bindings = <&none &none &none &none>;
+        };
+
+        pointer {
+            bindings = <&trans &trans &trans &trans>;
+        };
+
+        other {
+            bindings = <&trans &trans &trans &trans>;
+        };
+    };
+
+    rt_scale: rt_scale {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <INPUT_REL_X INPUT_REL_Y>;
+        multiplier = <889>;
+        divisor = <500>;
+    };
+
+    rt_xform: rt_xform {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        x-codes = <INPUT_REL_X>;
+        y-codes = <INPUT_REL_Y>;
+    };
+
+    rt_map: rt_map {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        map = <INPUT_REL_Y INPUT_REL_WHEEL>;
+        start-disabled;
+    };
+
+    rt_layer: rt_layer {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <1>;
+        timeout-ms = <200>;
+        require-prior-idle-ms = <30>;
+    };
+};
+
+/* Nothing is scanned. The one event ends the process if a boot ever hangs. */
+&kscan {
+    events = <ZMK_MOCK_PRESS(1,1,30000) ZMK_MOCK_RELEASE(1,1,10)>;
+};

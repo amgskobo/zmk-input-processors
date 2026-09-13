@@ -1,0 +1,2 @@
+# layer_over: layer 2 in a two-layer keymap
+static assertion failed: "layer must name a layer this keymap has"

@@ -27,14 +27,11 @@
 
 #include <zmk-input-processors/custom_settings.h>
 #include <zmk-input-processors/runtime_temp_layer.h>
+#include <zmk-input-processors/runtime_temp_layer_policy.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-/* One minute of either timer is already far past useful; the bound is there so
- * a client greys out a value that would look like the layer had stuck. */
-#define RUNTIME_TEMP_LAYER_MAX_MS 60000
-
-#define RUNTIME_TEMP_LAYER_SETTING(n, field, key, ...)                                            \
+#define RUNTIME_TEMP_LAYER_SETTING(n, field, key, ...)                                             \
     ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
         runtime_temp_layer_cs_##field##_##n, ZMK_INPUT_PROCESSORS_SUBSYSTEM,                       \
         ZMK_INPUT_PROCESSORS_SETTING_KEY(n, key), ZMK_CUSTOM_SETTING_VALUE_TYPE_INT32,             \
@@ -125,7 +122,9 @@ static bool read_int32(const struct zmk_custom_setting *setting, uint32_t *out) 
         if (read_bool(&runtime_temp_layer_cs_enabled_##n, &params.enabled) &&                      \
             read_int32(&runtime_temp_layer_cs_layer_##n, &layer) &&                                \
             read_int32(&runtime_temp_layer_cs_timeout_ms_##n, &params.timeout_ms) &&               \
-            read_int32(&runtime_temp_layer_cs_require_prior_idle_ms_##n, &prior_idle)) {           \
+            read_int32(&runtime_temp_layer_cs_require_prior_idle_ms_##n, &prior_idle) &&           \
+            runtime_temp_layer_values_valid(layer, params.timeout_ms, prior_idle,                  \
+                                            ZMK_KEYMAP_LAYERS_LEN)) {                              \
             params.layer = (uint8_t)layer;                                                         \
             params.require_prior_idle_ms = (uint16_t)prior_idle;                                   \
             (void)runtime_temp_layer_set_params(DEVICE_DT_INST_GET(n), &params);                   \

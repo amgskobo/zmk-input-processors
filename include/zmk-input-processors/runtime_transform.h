@@ -19,7 +19,7 @@
 
 #include <stdbool.h>
 
-#include <zephyr/device.h>
+struct device;
 
 struct runtime_transform_flags {
     /* Exchanges the X and Y codes, applied before either inversion. */

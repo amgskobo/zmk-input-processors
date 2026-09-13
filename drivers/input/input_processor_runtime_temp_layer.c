@@ -46,6 +46,7 @@
 #include <zmk/keymap.h>
 
 #include <zmk-input-processors/runtime_temp_layer.h>
+#include <zmk-input-processors/runtime_temp_layer_policy.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -61,9 +62,14 @@ struct runtime_temp_layer_data {
     struct runtime_temp_layer_params params;
 
     bool is_active;
+    /* Set when input requested activation; invalidating events clear it. */
+    bool activation_pending;
     /* The layer actually raised, which params.layer may have moved past. */
     uint8_t active_layer;
     int64_t last_tapped;
+    /* Absolute deadline lets a running stale timeout recognize a newer one. */
+    int64_t deactivate_at;
+    bool force_deactivate;
 
     struct k_work activate_work;
     struct k_work_delayable deactivate_work;
@@ -120,7 +126,14 @@ static void activate_work_cb(struct k_work *work) {
         return;
     }
 
-    set_layer_locked(data, true);
+    const bool typing = runtime_temp_layer_is_typing(
+        data->last_tapped, data->params.require_prior_idle_ms, k_uptime_get());
+
+    if (data->activation_pending &&
+        runtime_temp_layer_should_activate(data->params.enabled, data->is_active, typing)) {
+        set_layer_locked(data, true);
+    }
+    data->activation_pending = false;
 
     k_mutex_unlock(&data->lock);
 }
@@ -134,13 +147,26 @@ static void deactivate_work_cb(struct k_work *work) {
         return;
     }
 
-    set_layer_locked(data, false);
+    if (data->force_deactivate) {
+        data->force_deactivate = false;
+        data->deactivate_at = 0;
+        set_layer_locked(data, false);
+    } else if (data->params.enabled && data->is_active && data->params.timeout_ms > 0 &&
+               data->deactivate_at > 0) {
+        const int64_t remaining = data->deactivate_at - k_uptime_get();
+
+        if (remaining > 0) {
+            k_work_reschedule(&data->deactivate_work, K_MSEC(remaining));
+        } else {
+            data->deactivate_at = 0;
+            set_layer_locked(data, false);
+        }
+    }
 
     k_mutex_unlock(&data->lock);
 }
 
-int runtime_temp_layer_get_params(const struct device *dev,
-                                  struct runtime_temp_layer_params *out) {
+int runtime_temp_layer_get_params(const struct device *dev, struct runtime_temp_layer_params *out) {
     if (dev == NULL || out == NULL) {
         return -EINVAL;
     }
@@ -164,8 +190,10 @@ int runtime_temp_layer_set_params(const struct device *dev,
         return -EINVAL;
     }
 
-    if (params->layer >= ZMK_KEYMAP_LAYERS_LEN) {
-        LOG_WRN("%s: rejected layer %d", dev->name, params->layer);
+    if (!runtime_temp_layer_values_valid(params->layer, params->timeout_ms,
+                                         params->require_prior_idle_ms, ZMK_KEYMAP_LAYERS_LEN)) {
+        LOG_WRN("%s: rejected layer %u, timeout %u ms, prior idle %u ms", dev->name, params->layer,
+                params->timeout_ms, params->require_prior_idle_ms);
         return -EINVAL;
     }
 
@@ -177,6 +205,11 @@ int runtime_temp_layer_set_params(const struct device *dev,
 
     data->params = *params;
 
+    /* A queued event belongs to the parameters it observed. Do not let it
+     * raise either the old or the new layer after a setting update. */
+    data->activation_pending = false;
+    (void)k_work_cancel(&data->activate_work);
+
     /*
      * A layer this processor is holding has nothing else responsible for
      * lowering it once the processor is switched off, so drop it here rather
@@ -185,12 +218,24 @@ int runtime_temp_layer_set_params(const struct device *dev,
      * whichever thread wrote the setting.
      */
     const bool release_held_layer = !params->enabled && data->is_active;
+    const bool restart_timeout = params->enabled && data->is_active && params->timeout_ms > 0;
 
-    k_mutex_unlock(&data->lock);
+    data->force_deactivate = release_held_layer;
+    if (restart_timeout) {
+        data->deactivate_at = k_uptime_get() + params->timeout_ms;
+    } else {
+        data->deactivate_at = 0;
+    }
 
     if (release_held_layer) {
         k_work_reschedule(&data->deactivate_work, K_NO_WAIT);
+    } else if (restart_timeout) {
+        k_work_reschedule(&data->deactivate_work, K_MSEC(params->timeout_ms));
+    } else {
+        k_work_cancel_delayable(&data->deactivate_work);
     }
+
+    k_mutex_unlock(&data->lock);
 
     LOG_DBG("%s: %s, layer %d, timeout %u ms, prior idle %u ms", dev->name,
             params->enabled ? "on" : "off", params->layer, params->timeout_ms,
@@ -223,6 +268,8 @@ static int handle_layer_state_changed(const struct device *dev) {
      */
     if (data->is_active && !zmk_keymap_layer_active(data->active_layer)) {
         data->is_active = false;
+        data->deactivate_at = 0;
+        data->force_deactivate = false;
         k_work_cancel_delayable(&data->deactivate_work);
     }
 
@@ -244,9 +291,16 @@ static int handle_position_state_changed(const struct device *dev,
         return ZMK_EV_EVENT_BUBBLE;
     }
 
-    if (data->is_active && !position_is_excluded(config, ev->position)) {
+    if (runtime_temp_layer_should_drop_for_position(data->is_active, ev->state,
+                                                    config->num_positions > 0,
+                                                    position_is_excluded(config, ev->position))) {
         set_layer_locked(data, false);
+        data->deactivate_at = 0;
+        data->force_deactivate = false;
         k_work_cancel_delayable(&data->deactivate_work);
+    } else if (!position_is_excluded(config, ev->position)) {
+        /* Do not let queued work raise the layer after a disqualifying press. */
+        data->activation_pending = false;
     }
 
     k_mutex_unlock(&data->lock);
@@ -267,6 +321,9 @@ static int handle_keycode_state_changed(const struct device *dev,
     }
 
     data->last_tapped = ev->timestamp;
+    /* The queued activation rechecks typing, but clearing this also covers a
+     * zero idle guard and preserves event order. */
+    data->activation_pending = false;
 
     k_mutex_unlock(&data->lock);
 
@@ -316,9 +373,9 @@ ZMK_SUBSCRIPTION(runtime_temp_layer, zmk_layer_state_changed);
  * nothing. Runtime-ifying a value invalidates every #if that used to depend on
  * it, which is the price of the move and worth paying once here.
  */
-#define NEEDS_POSITIONS(n, ...) DT_INST_PROP_HAS_IDX(n, excluded_positions, 0)
+#define NEEDS_POSITIONS(n) DT_INST_PROP_HAS_IDX(n, excluded_positions, 0) ||
 
-#if DT_INST_FOREACH_STATUS_OKAY_VARGS(NEEDS_POSITIONS, ||)
+#if DT_INST_FOREACH_STATUS_OKAY(NEEDS_POSITIONS) 0
 ZMK_SUBSCRIPTION(runtime_temp_layer, zmk_position_state_changed);
 #endif
 
@@ -349,16 +406,18 @@ static int runtime_temp_layer_handle_event(const struct device *dev, struct inpu
         return ZMK_INPUT_PROC_CONTINUE;
     }
 
-    const int64_t now = k_uptime_get();
-    const bool typing = params.require_prior_idle_ms > 0 &&
-                        (data->last_tapped + params.require_prior_idle_ms) > now;
+    const bool typing = runtime_temp_layer_is_typing(data->last_tapped,
+                                                     params.require_prior_idle_ms, k_uptime_get());
 
-    if (!data->is_active && !typing) {
+    if (runtime_temp_layer_should_activate(params.enabled, data->is_active, typing)) {
         data->active_layer = params.layer;
+        data->activation_pending = true;
         k_work_submit(&data->activate_work);
     }
 
-    if (params.timeout_ms > 0) {
+    if (runtime_temp_layer_should_schedule_timeout(&params)) {
+        data->deactivate_at = k_uptime_get() + params.timeout_ms;
+        data->force_deactivate = false;
         k_work_reschedule(&data->deactivate_work, K_MSEC(params.timeout_ms));
     }
 
@@ -383,8 +442,14 @@ static const struct zmk_input_processor_driver_api runtime_temp_layer_driver_api
 };
 
 #define RUNTIME_TEMP_LAYER_INST(n)                                                                 \
-    BUILD_ASSERT(DT_INST_PROP(n, layer) < ZMK_KEYMAP_LAYERS_LEN,                                   \
+    BUILD_ASSERT(DT_INST_PROP(n, layer) >= 0 && DT_INST_PROP(n, layer) < ZMK_KEYMAP_LAYERS_LEN,    \
                  "layer must name a layer this keymap has");                                       \
+    BUILD_ASSERT(DT_INST_PROP(n, timeout_ms) >= 0 &&                                               \
+                     DT_INST_PROP(n, timeout_ms) <= RUNTIME_TEMP_LAYER_MAX_MS,                     \
+                 "timeout-ms must be 0-60000");                                                    \
+    BUILD_ASSERT(DT_INST_PROP_OR(n, require_prior_idle_ms, 0) >= 0 &&                              \
+                     DT_INST_PROP_OR(n, require_prior_idle_ms, 0) <= RUNTIME_TEMP_LAYER_MAX_MS,    \
+                 "require-prior-idle-ms must be 0-60000");                                         \
     static const uint16_t runtime_temp_layer_positions_##n[] =                                     \
         DT_INST_PROP_OR(n, excluded_positions, {});                                                \
     static const struct runtime_temp_layer_config runtime_temp_layer_config_##n = {                \

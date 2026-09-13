@@ -36,8 +36,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
     ZMK_INPUT_PROCESSORS_ASSERT_NAME_FITS(n, "enabled")                                            \
     ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
         runtime_code_mapper_cs_enabled_##n, ZMK_INPUT_PROCESSORS_SUBSYSTEM,                        \
-        ZMK_INPUT_PROCESSORS_SETTING_KEY(n, "enabled"),                       \
-        ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL,                                                        \
+        ZMK_INPUT_PROCESSORS_SETTING_KEY(n, "enabled"), ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL,        \
         ZMK_CUSTOM_SETTING_VALUE_BOOL(!DT_INST_PROP(n, start_disabled)),                           \
         ZMK_CUSTOM_SETTING_CONFIDENTIALITY_RPC_PUBLIC, ZMK_CUSTOM_SETTING_PERMISSION_UNSECURE,     \
         ZMK_CUSTOM_SETTING_PERMISSION_SECURE, ZMK_CUSTOM_SETTING_NO_CONSTRAINT);

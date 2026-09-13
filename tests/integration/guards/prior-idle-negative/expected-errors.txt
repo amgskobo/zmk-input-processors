@@ -1,0 +1,2 @@
+# prior_idle_negative: -1
+static assertion failed: "require-prior-idle-ms must be 0-60000"

@@ -19,7 +19,7 @@
 
 #include <stdbool.h>
 
-#include <zephyr/device.h>
+struct device;
 
 /* Reads whether the map is being applied right now. */
 int runtime_code_mapper_get_enabled(const struct device *dev, bool *out);

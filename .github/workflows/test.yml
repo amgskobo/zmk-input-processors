@@ -1,13 +1,27 @@
+# Copyright (c) 2026 amgskobo
+# SPDX-License-Identifier: MIT
+
 name: Test
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   core:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
-      - name: Build and run host tests
-        run: ./tests/run.sh
+      - name: Run the contract tests in Docker
+        run: bash ./tests/run-docker.sh
+      - name: Build the firmware, guard and runtime suites against ZMK in Docker
+        run: bash ./tests/run-integration-docker.sh

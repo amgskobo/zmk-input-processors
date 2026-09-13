@@ -30,14 +30,15 @@ properties:
     required: true
     description: >-
       Milliseconds of pointer silence before the layer drops. Zero leaves the
-      layer up until a key outside excluded-positions is pressed.
+      layer up until a key outside excluded-positions is pressed. Must be from
+      0 through 60000.
   require-prior-idle-ms:
     type: int
     default: 0
     description: >-
       Milliseconds after a key press during which the layer will not come up.
       This is what stops a brush against the pad mid-word from turning the next
-      key into a click. Zero disables the guard.
+      key into a click. Zero disables the guard; the maximum is 60000.
   excluded-positions:
     type: array
     description: >-

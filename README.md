@@ -1,12 +1,14 @@
 # ZMK Input Processors
 
+[![Test](https://github.com/amgskobo/zmk-input-processors/actions/workflows/test.yml/badge.svg)](https://github.com/amgskobo/zmk-input-processors/actions/workflows/test.yml)
+
 Runtime-configurable versions of ZMK's standard input processors.
 
-ZMK ships five — scaler, transform, code-mapper, temp-layer, behaviors — and
-each builds its parameters into flash from devicetree, so changing a pointer's
-speed or a pad's orientation means a rebuild. These four are the same
-processors with those parameters in RAM, named `runtime-*` so a chain shows at
-a glance which stages can be changed while the keyboard runs.
+ZMK ships four configurable input processors—scaler, transform, code-mapper,
+and temp-layer—and builds their parameters into flash from devicetree, so
+changing a pointer's speed or a pad's orientation means a rebuild. These are
+the same four processors with those parameters in RAM, named `runtime-*` so a
+chain shows at a glance which stages can be changed while the keyboard runs.
 
 They need nothing but upstream ZMK. The runtime *access* is what needs more:
 ZMK has no protocol for reaching a processor's parameters, so that half is
@@ -33,8 +35,9 @@ Originals live elsewhere, one module each —
 
 ## Compatibility
 
-- Works on standalone keyboards and split keyboards (central role only)
-- **Note**: For split keyboard configurations, this processor must run on the central half, not the peripheral
+- The scaler, transform and code mapper work on standalone and split builds,
+  including a peripheral that owns an input listener
+- The temp-layer processor is central-only because it changes keymap layer state
 - Requires `CONFIG_ZMK_POINTING` enabled
 
 ## Installation
@@ -61,14 +64,18 @@ Then run:
 west update
 ```
 
-### Option 2: Using Environment Variable
+### Option 2: Using a Local Checkout
 
-Set the environment variable before building:
+Pass a local checkout to ZMK's build with `ZMK_EXTRA_MODULES`:
 
 ```bash
-export ZEPHYR_EXTRA_MODULES=/path/to/zmk-input-processors
-west build -b <board> -s <app-dir>
+west build -b <board> -s zmk/app -- -DZMK_EXTRA_MODULES=/path/to/zmk-input-processors
 ```
+
+Not `ZEPHYR_EXTRA_MODULES`. ZMK sets that variable itself, to load its own
+boards and keymap handling, and a value from the environment or the command
+line replaces ZMK's list rather than adding to it: the build then fails to
+find ZMK's boards.
 
 ## Usage
 
@@ -83,14 +90,13 @@ to them:
 | :--- | :--- | :--- |
 | `zip_runtime_xy_scaler` | `zip_rt_xy_scale` | relative X/Y, 1/1 |
 | `zip_runtime_xy_transform` | `zip_rt_xy_xform` | relative X/Y, no transform |
-| `zip_runtime_pointer_scaler` | `zip_rt_ptr_scale` | relative X/Y, 1/1 |
 | `zip_runtime_scroll_scaler` | `zip_rt_scr_scale` | WHEEL/HWHEEL, 1/1 |
-| `zip_runtime_pointer_transform` | `zip_rt_ptr_xform` | relative X/Y, no transform |
 | `zip_runtime_scroll_transform` | `zip_rt_scr_xform` | WHEEL/HWHEEL, no transform |
+| `zip_runtime_scroll_mapper` | `zip_rt_scr_map` | Y→WHEEL, X→HWHEEL |
+| `zip_runtime_temp_layer` | `zip_rt_tmp_layer` | layer 0, 400 ms timeout, 300 ms prior-idle guard |
 
-Code mapping needs an application-specific map, and temporary-layer processing
-needs an application-specific layer and timeout, so those remain explicit
-board DTS nodes rather than unsafe module defaults.
+Boards override the destination layer and excluded physical positions on the
+temp-layer node when needed.
 
 ## Naming
 
@@ -203,10 +209,10 @@ Every processor here keeps its state in its own `data` struct, and the
 temp-layer's work items are per instance, so instances do not interfere. Two
 things are worth knowing anyway:
 
-- **Settings keys cannot collide.** A key is the node's devicetree name plus
-  the field, and devicetree node names are unique by construction, so two
-  instances cannot end up editing each other's values. Nothing is written by
-  hand and nothing has to be checked.
+- **Settings keys normally differ by node name.** Devicetree guarantees that
+  siblings have different names, but nodes under different parents can still
+  share one. The module checks all published keys at startup and logs the
+  duplicate rather than silently pretending that both instances are editable.
 - **Two temp-layer instances pointed at one layer share it.** A ZMK layer is a
   bit, not a reference count, so whichever drops it first drops it for both.
   It resolves itself rather than sticking — the layer change reaches both, each
@@ -279,13 +285,12 @@ remainder in an `int16_t` slot, and holding the two numbers inside the positive
 `int16` range is what guarantees the remainder fits it. A value outside the
 range fails the build through a `BUILD_ASSERT`, and is refused at runtime.
 
-A remainder left behind by a *different* ratio is discarded rather than carried
-in. The remainder lives in the listener's slot, not in the processor, so it
-survives a ratio change that the processor knows nothing about — and it is a
-fraction of one count in the ratio that produced it, meaning nothing in the new
-one. Carried in, going from 889/500 to 1/16 would spend up to 31 counts of
-movement nobody asked for on the first report after the edit: a visible jump,
-where the remainder exists to smooth a rounding difference.
+A remainder outside the range the current divisor could have produced is
+discarded. The remainder lives in the listener's slot, not in the processor,
+so it survives a runtime ratio change. Rejecting an incompatible remainder
+prevents a large first-report jump; a remainder still valid for the new
+divisor can affect the next report by less than one count, which is the rounding
+difference the remainder exists to carry.
 
 ### Enable the Runtime Transform
 
@@ -387,8 +392,8 @@ pointer_layer: pointer_layer {
 | Property | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `layer` | int | *required* | Layer to raise, as a layer **ID**. |
-| `timeout-ms` | int | *required* | Pointer silence before the layer drops. 0 = never. |
-| `require-prior-idle-ms` | int | 0 | Window after a key press in which the layer will not come up. |
+| `timeout-ms` | int | *required* | Pointer silence before the layer drops, 0 to 60000 ms. 0 = never. |
+| `require-prior-idle-ms` | int | 0 | Window after a key press in which the layer will not come up, 0 to 60000 ms. |
 | `excluded-positions` | array | *none* | Positions that do not drop the layer. |
 | `start-disabled` | bool | false | Start switched off, raising nothing. |
 
@@ -397,8 +402,9 @@ keymap's own layer list and the row reads "MOUSE (3)" rather than "3" — a
 layer is the one value here that cannot be sanity-checked by looking at it. The
 range is declared alongside it as a fallback for a client that does not
 understand the constraint, and neither is trusted: the driver rejects a layer
-outside the keymap regardless, because a constraint is a drawing hint that
-reaches the client and not a rule the firmware may assume was obeyed.
+outside the keymap and either timer past 60000 regardless, because a constraint
+is a drawing hint that reaches the client and not a rule the firmware may
+assume was obeyed.
 
 `start-disabled` exists because this stage has no other no-op. Every other
 processor here can be made to pass through by editing its own values — a
@@ -409,9 +415,21 @@ raise". So the switch is explicit, and switching it off drops a layer this
 processor is currently holding rather than leaving it up with nothing left
 responsible for lowering it.
 
+Activation is queued onto the system work queue rather than performed from
+inside the input callback. The worker rechecks the current enabled state and
+typing guard before raising anything; disabling the processor or receiving a
+disqualifying key press also invalidates a queued activation. A stale work item
+therefore cannot raise the layer after the event that cancelled it.
+
 `excluded-positions` stays structural. A list of key positions is not something
 a generic settings list can draw, and it belongs to the physical layout rather
-than to taste.
+than to taste. Omitting the property disables position-based dropping entirely,
+so only a nonzero timeout or switching the processor off can lower its layer.
+
+Changing the timeout while the layer is raised restarts it from the setting
+update. Setting it to zero cancels the pending timeout. Any activation queued
+before a parameter update is discarded, so an event observed under old
+parameters cannot raise either the old or the new layer afterwards.
 
 Three things differ from upstream beyond the parameters:
 
@@ -432,19 +450,17 @@ Three things differ from upstream beyond the parameters:
 Every parameter in this module is published through
 [zmk-feature-custom-settings](https://github.com/cormoran/zmk-feature-custom-settings)
 when `CONFIG_ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS=y`. They appear under the
-`amgs_proc` subsystem in any Studio client that renders the
+`amgskobo__rip` subsystem in any Studio client that renders the
 custom settings list, with the declared type and range driving the widget, so
 this module ships no page and no protocol of its own.
 
 A key is the owning node's devicetree name, then the field:
 
 ```
-pointer_scale.multiplier
-pointer_scale.divisor
-scroll_scale.multiplier
-scroll_scale.divisor
-scroll_slider_scale_h.multiplier
-scroll_slider_scale_h.divisor
+zip_rt_xy_scale.multiplier
+zip_rt_scr_scale.multiplier
+zip_rt_tmp_layer.timeout_ms
+fine_scroll_scale.multiplier
 ```
 
 **So name nodes as though they were keys, because they are.** A name is what a
@@ -453,16 +469,12 @@ client shows, what a person searches for, and the prefix a chain view joins on.
 short:
 
 ```
-pointer_abs_rel   pointer_xform         pointer_scale_pre      pointer_accel
-pointer_scale     pointer_layer         stick_xform            stick_accel
-scroll_abs_rel    scroll_xform          scroll_scale           scroll_map
-scroll_pad_scale_v  scroll_pad_scale_h  scroll_slider_scale_v  scroll_slider_scale_h
+zip_rt_xy_scale     zip_rt_tmp_layer    zip_rt_scr_scale
+zip_rt_scr_xform    zip_rt_scr_map      fine_scroll_scale
 ```
 
-Nest rather than shorten when a route has sub-routes. The two scroll routes
-were first called `pad_` and `slider_`, which put their stages three places
-apart from the `scroll_` stages they share, in the sorted list the route prefix
-exists to group. `pad_` was also one letter from `padstick`.
+Nest rather than shorten when a route has sub-routes, so related stages stay
+together in a sorted settings list.
 
 **The field is named for what the value means, not for how the devicetree
 property is spelt.** A key is the label a client draws, so `start-disabled`
@@ -472,12 +484,9 @@ reads as the button being on where it means the button is being taken away.
 Nothing is abbreviated to save room that the 48-byte cap was not asking for,
 which is why `multiplier` is not `mul`.
 
-Length is not a style question here. A DYA configuration that combines these
-processors with absolute-to-relative keeps every settings node at **19
-characters or fewer**. Use a short route plus role, such as `scroll_abs_rel`,
-`pointer_scale`, or `stick_accel`; keep the reference label descriptive. This
-fits the strictest persisted-name budget, while each module also asserts its
-own key and storage-name limits at build time.
+Length is not a style question here. This module asserts both the key and
+storage-name limits at build time. With its `amgskobo__rip` subsystem and
+longest field name, a node has a budget of **19 characters**.
 
 An option label — how a client offers a node in a dropdown — is separately
 capped at 32 bytes including the terminator and truncates silently. The
@@ -526,9 +535,8 @@ first match — so the module checks once at startup and logs
 
 Two costs are worth knowing. Renaming a node orphans its stored value, though
 a rename is a firmware change and needs a reflash anyway. And keys are as long
-as the node names, against a 48-byte cap: the longest this keyboard produces is
-`runtime_temp_layer.prior_idle_ms` at 32 bytes, and a name that does not fit
-fails the build loudly rather than truncating.
+as the node names, against a 48-byte cap; a name that does not fit fails the
+build loudly rather than truncating.
 
 The registry also owns persistence. The drivers store nothing themselves, which
 is what keeps a value from having two owners that can disagree after a reboot.
@@ -581,11 +589,13 @@ directly — see `include/zmk-input-processors/runtime_scaler.h`.
 ├── include/
 │   └── zmk-input-processors/       # runtime APIs and the settings namespace
 ├── dts/
-│   └── bindings/
-│       ├── zmk,input-processor-runtime-scaler.yaml
-│       ├── zmk,input-processor-runtime-transform.yaml
-│       ├── zmk,input-processor-runtime-code-mapper.yaml
-│       └── zmk,input-processor-runtime-temp-layer.yaml
+│   ├── bindings/
+│   │   ├── zmk,input-processor-runtime-scaler.yaml
+│   │   ├── zmk,input-processor-runtime-transform.yaml
+│   │   ├── zmk,input-processor-runtime-code-mapper.yaml
+│   │   └── zmk,input-processor-runtime-temp-layer.yaml
+│   └── zmk-input-processors/input_processor_runtime.dtsi
+├── tests/                             # host and ZMK integration suites
 ├── zephyr/
 │   └── module.yml                    # Zephyr module registration
 └── .github/
@@ -596,76 +606,63 @@ directly — see `include/zmk-input-processors/runtime_scaler.h`.
 
 ### Tests
 
-Arithmetic that has no Zephyr dependency lives in a header under `include/`
-and is covered by host tests:
+Every test runs in Docker, in the same ZMK build image family as firmware
+builds, with the source tree mounted read-only:
 
 ```bash
-./tests/run.sh
+bash ./tests/run-docker.sh
+bash ./tests/run-integration-docker.sh
 ```
 
-Not everything needs this. The scaler has it because its six lines of
-arithmetic shipped wrong in two independent implementations and were found on
-hardware rather than in review, which is exactly the shape of thing worth
-pinning where it can be checked in a second.
+`run-docker.sh` runs the contract tests in `tests/unit/`, one program for each
+header of dependency-free logic the drivers call. Each is built three ways --
+optimised, under AddressSanitizer and UndefinedBehaviorSanitizer, and as a
+32-bit program like the firmware it models -- and the headers also have to
+compile on their own, free of Zephyr, under `-Wconversion`. The scaler is
+checked against values pinned from the hardware session that found the
+reversal, a reference model, a million random cases, and the invariant that no
+movement is lost or invented. The transform, the code map and the temp-layer
+policy are checked across their whole input domains.
+
+`run-integration-docker.sh` fetches the DYA ZMK fork with
+`zmk-feature-custom-settings`, and upstream ZMK without it -- and no keyboard
+configuration or other input-processor module -- and runs four suites:
+
+| Suite | What it proves |
+| :--- | :--- |
+| `firmware` | A shield with one instance of every processor builds for a real board, with every settings key in the image; and both halves of a split keyboard sharing one devicetree build, the central half with its settings and the peripheral half without settings or the central-only temp layer. |
+| `guards` | Devicetree past each documented limit is refused at build time with its own message, and devicetree exactly at the limit builds. |
+| `runtime` | On native_sim, compared with snapshots: every driver's API, event filtering and temp-layer timing against ZMK's own keymap; every published setting's type, default and range, the Studio subsystem they are published under, writes reaching the drivers, stored values applied again after a reboot, and duplicate keys reported at boot; a listener chain producing the HID reports worked out by hand; and the ready-made nodes in `input_processor_runtime.dtsi` starting at the defaults documented above. |
+| `upstream` | The runtime cases that need no custom settings, built and run against upstream ZMK with `zmk-feature-custom-settings` absent, as the introduction says they can be. |
+
+Name suites to run a subset. A Docker volume keeps the ZMK workspaces between
+runs, which turns each fetch into an update:
+
+```bash
+ZMK_TEST_WORKSPACE_VOLUME=zmk-input-processors-tests \
+  bash ./tests/run-integration-docker.sh runtime
+```
+
+A runtime case is a directory under `tests/integration/runtime/` holding a
+`native_sim.keymap`, a `native_sim.conf`, an `events.patterns` sed script and
+the `keycode_events.snapshot` it has to print, as in ZMK's own tests; a
+failing case prints the difference. A guard case under
+`tests/integration/guards/` lists in `expected-errors.txt` exactly the
+compiler errors it has to produce. ZMK compiles with `-Wfatal-errors`, so a
+guard case breaks at most one node per source file.
 
 ### Adding a New Input Processor
 
-See [.github/copilot-instructions.md](.github/copilot-instructions.md) for detailed AI agent guidelines. For quick reference:
-
-1. **Create C source** under `drivers/input/input_processor_<name>.c`
-   - Include required headers: `<zephyr/kernel.h>`, `<zephyr/device.h>`, `<zephyr/input/input.h>`, `<zephyr/sys/util.h>`, `<drivers/input_processor.h>`
-   - Implement the `zmk_input_processor_driver_api` with `handle_event` callback
-   - Use `DEVICE_DT_INST_DEFINE()` for device instantiation with `CONFIG_KERNEL_INIT_PRIORITY_DEFAULT`
-   - Use `CONTAINER_OF()` macro in callbacks for multi-instance support
-
-2. **Register in CMakeLists.txt** (`drivers/input/CMakeLists.txt`)
-   ```cmake
-   if (CONFIG_ZMK_INPUT_PROCESSOR_MY_PROCESSOR)
-       zephyr_library()
-       zephyr_library_sources(input_processor_my_processor.c)
-   endif()
-   ```
-
-3. **Add Kconfig entry** (`drivers/input/Kconfig`)
-   ```
-   DT_COMPAT_ZMK_INPUT_PROCESSOR_MY_PROCESSOR := zmk,input-processor-my-processor
-   config ZMK_INPUT_PROCESSOR_MY_PROCESSOR
-       bool
-       default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_MY_PROCESSOR))
-   ```
-
-4. **Create DTS binding** (`dts/bindings/zmk,input-processor-my-processor.yaml`)
-   ```yaml
-   compatible: "zmk,input-processor-my-processor"
-   properties:
-     "#input-processor-cells":
-       const: 0
-   ```
-
-5. **Provide example** (`dts/behaviors/input_processor_my_processor.dtsi`)
-   ```dts
-   / {
-       my_processor: my_processor {
-           compatible = "zmk,input-processor-my-processor";
-           status = "okay";
-           #input-processor-cells = <0>;
-       };
-   };
-   ```
-
-### Key Code Patterns
-
-- **Device tree config**: Use `DT_INST_PROP_OR(n, prop, default)` for device-tree-backed values
-- **Motion smoothing**: Store both previous position and previous delta; average current delta with previous delta using `(dx + prev_dx) / 2`. Divide rather than shift - a shift rounds towards minus infinity and makes the same path measure longer one way than the other
-- **Delayed work**: Use Zephyr's `k_work_delayable` primitives (`k_work_init_delayable`, `k_work_reschedule`)
-- **Multi-instance callbacks**: Use `CONTAINER_OF()` to retrieve driver state from work struct (not `DEVICE_DT_INST_GET(0)`)
-- **Logging**: Use `LOG_MODULE_REGISTER(name, CONFIG_ZMK_LOG_LEVEL)` and `LOG_INF()` for debugging
-
-See [drivers/input/input_processor_runtime_scaler.c](drivers/input/input_processor_runtime_scaler.c) for a complete reference implementation, and its `*_custom_settings.c` beside it for how a parameter is published.
+See the [contributor guide](.github/copilot-instructions.md) for the module's
+architecture, correctness rules, required tests, and local-checkout workflow.
+The scaler
+[driver](drivers/input/input_processor_runtime_scaler.c) and its adjacent
+`*_custom_settings.c` adapter are the smallest complete example of a runtime
+parameter and its optional Studio publication.
 
 ## License
 
-MIT — See individual file headers for copyright information.
+[MIT](LICENSE) — see individual file headers for copyright information.
 
 ## Contributing
 

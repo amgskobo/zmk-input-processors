@@ -1,0 +1,3 @@
+s/.*\(Duplicate setting key "[^"]*"\).*/\1/p
+/^PASS: /p
+/^FAIL: /p

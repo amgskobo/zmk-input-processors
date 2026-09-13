@@ -18,31 +18,31 @@
 DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_SCALER := zmk,input-processor-runtime-scaler
 
 config ZMK_INPUT_PROCESSOR_RUNTIME_SCALER
-		bool
-		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_SCALER))
-		depends on ZMK_POINTING
+	bool
+	default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_SCALER))
+	depends on ZMK_POINTING
 
 DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TRANSFORM := zmk,input-processor-runtime-transform
 
 config ZMK_INPUT_PROCESSOR_RUNTIME_TRANSFORM
-		bool
-		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TRANSFORM))
-		depends on ZMK_POINTING
+	bool
+	default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TRANSFORM))
+	depends on ZMK_POINTING
 
 DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_CODE_MAPPER := zmk,input-processor-runtime-code-mapper
 
 config ZMK_INPUT_PROCESSOR_RUNTIME_CODE_MAPPER
-		bool
-		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_CODE_MAPPER))
-		depends on ZMK_POINTING
+	bool
+	default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_CODE_MAPPER))
+	depends on ZMK_POINTING
 
 DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TEMP_LAYER := zmk,input-processor-runtime-temp-layer
 
 config ZMK_INPUT_PROCESSOR_RUNTIME_TEMP_LAYER
-		bool
-		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TEMP_LAYER))
-		depends on ZMK_POINTING
-		depends on (!ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL)
+	bool
+	default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TEMP_LAYER))
+	depends on ZMK_POINTING
+	depends on !ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL
 
 config ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS
 	bool "Publish input processor parameters through zmk-feature-custom-settings"

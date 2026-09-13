@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
  * Ready-to-reference runtime input processors.
  *
  * The label is deliberately stable for input chains; the short node name is
@@ -27,16 +30,6 @@
         y-codes = <INPUT_REL_Y>;
     };
 
-    zip_runtime_pointer_scaler: /omit-if-no-ref/ zip_rt_ptr_scale {
-        compatible = "zmk,input-processor-runtime-scaler";
-        #input-processor-cells = <0>;
-        type = <INPUT_EV_REL>;
-        codes = <INPUT_REL_X>, <INPUT_REL_Y>;
-        multiplier = <1>;
-        divisor = <1>;
-        track-remainders;
-    };
-
     zip_runtime_scroll_scaler: /omit-if-no-ref/ zip_rt_scr_scale {
         compatible = "zmk,input-processor-runtime-scaler";
         #input-processor-cells = <0>;
@@ -47,19 +40,30 @@
         track-remainders;
     };
 
-    zip_runtime_pointer_transform: /omit-if-no-ref/ zip_rt_ptr_xform {
-        compatible = "zmk,input-processor-runtime-transform";
-        #input-processor-cells = <0>;
-        type = <INPUT_EV_REL>;
-        x-codes = <INPUT_REL_X>;
-        y-codes = <INPUT_REL_Y>;
-    };
-
     zip_runtime_scroll_transform: /omit-if-no-ref/ zip_rt_scr_xform {
         compatible = "zmk,input-processor-runtime-transform";
         #input-processor-cells = <0>;
         type = <INPUT_EV_REL>;
         x-codes = <INPUT_REL_HWHEEL>;
         y-codes = <INPUT_REL_WHEEL>;
+    };
+
+    /* Standard two-axis pointer-to-scroll mapping. */
+    zip_runtime_scroll_mapper: /omit-if-no-ref/ zip_rt_scr_map {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        type = <INPUT_EV_REL>;
+        map = <INPUT_REL_Y INPUT_REL_WHEEL>,
+              <INPUT_REL_X INPUT_REL_HWHEEL>;
+    };
+
+    /* Boards choose the destination layer and their physical click keys.
+     * The timings are common pointer-layer defaults. */
+    zip_runtime_temp_layer: /omit-if-no-ref/ zip_rt_tmp_layer {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <0>;
+        timeout-ms = <400>;
+        require-prior-idle-ms = <300>;
     };
 };

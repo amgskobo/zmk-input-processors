@@ -18,8 +18,9 @@ properties:
     type: int
     default: 2
     description: >-
-      Event type to act on, from dt-bindings/zmk/input_transform.h. The default
-      is INPUT_EV_REL (2).
+      Event type to act on, from
+      zephyr/dt-bindings/input/input-event-codes.h. The default is INPUT_EV_REL
+      (2).
   codes:
     type: array
     required: true

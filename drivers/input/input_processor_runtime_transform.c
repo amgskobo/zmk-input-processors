@@ -18,10 +18,12 @@
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/atomic.h>
 
 #include <drivers/input_processor.h>
 
 #include <zmk-input-processors/runtime_transform.h>
+#include <zmk-input-processors/runtime_transform_math.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -35,17 +37,47 @@ struct runtime_transform_config {
 };
 
 struct runtime_transform_data {
-    struct runtime_transform_flags flags;
+    atomic_t flags;
 };
+
+enum runtime_transform_flag_bit {
+    RUNTIME_TRANSFORM_XY_SWAP_BIT,
+    RUNTIME_TRANSFORM_X_INVERT_BIT,
+    RUNTIME_TRANSFORM_Y_INVERT_BIT,
+};
+
+static atomic_val_t encode_flags(const struct runtime_transform_flags *flags) {
+    atomic_val_t encoded = 0;
+
+    if (flags->xy_swap) {
+        encoded |= BIT(RUNTIME_TRANSFORM_XY_SWAP_BIT);
+    }
+    if (flags->x_invert) {
+        encoded |= BIT(RUNTIME_TRANSFORM_X_INVERT_BIT);
+    }
+    if (flags->y_invert) {
+        encoded |= BIT(RUNTIME_TRANSFORM_Y_INVERT_BIT);
+    }
+
+    return encoded;
+}
+
+static struct runtime_transform_flags decode_flags(atomic_val_t encoded) {
+    return (struct runtime_transform_flags){
+        .xy_swap = (encoded & BIT(RUNTIME_TRANSFORM_XY_SWAP_BIT)) != 0,
+        .x_invert = (encoded & BIT(RUNTIME_TRANSFORM_X_INVERT_BIT)) != 0,
+        .y_invert = (encoded & BIT(RUNTIME_TRANSFORM_Y_INVERT_BIT)) != 0,
+    };
+}
 
 int runtime_transform_get_flags(const struct device *dev, struct runtime_transform_flags *out) {
     if (dev == NULL || out == NULL) {
         return -EINVAL;
     }
 
-    const struct runtime_transform_data *data = dev->data;
+    struct runtime_transform_data *data = dev->data;
 
-    *out = data->flags;
+    *out = decode_flags(atomic_get(&data->flags));
 
     return 0;
 }
@@ -58,26 +90,12 @@ int runtime_transform_set_flags(const struct device *dev,
 
     struct runtime_transform_data *data = dev->data;
 
-    unsigned int key = irq_lock();
-
-    data->flags = *flags;
-
-    irq_unlock(key);
+    atomic_set(&data->flags, encode_flags(flags));
 
     LOG_DBG("%s: swap %d, invert x %d y %d", dev->name, flags->xy_swap, flags->x_invert,
             flags->y_invert);
 
     return 0;
-}
-
-static int code_idx(uint16_t code, const uint16_t *list, size_t len) {
-    for (size_t i = 0; i < len; i++) {
-        if (list[i] == code) {
-            return (int)i;
-        }
-    }
-
-    return -ENODEV;
 }
 
 static int runtime_transform_handle_event(const struct device *dev, struct input_event *event,
@@ -95,33 +113,10 @@ static int runtime_transform_handle_event(const struct device *dev, struct input
         return ZMK_INPUT_PROC_CONTINUE;
     }
 
-    unsigned int key = irq_lock();
-    const struct runtime_transform_flags flags = data->flags;
-    irq_unlock(key);
+    const struct runtime_transform_flags flags = decode_flags(atomic_get(&data->flags));
 
-    if (flags.xy_swap) {
-        int idx = code_idx(event->code, config->x_codes, config->x_codes_len);
-
-        if (idx >= 0) {
-            event->code = config->y_codes[idx];
-        } else {
-            idx = code_idx(event->code, config->y_codes, config->y_codes_len);
-
-            if (idx >= 0) {
-                event->code = config->x_codes[idx];
-            }
-        }
-    }
-
-    /*
-     * Read after the swap, so a swapped event is inverted according to the
-     * axis it now travels on rather than the one it arrived on. That is
-     * upstream's order; reversing it would make swap and invert interact.
-     */
-    if ((flags.x_invert && code_idx(event->code, config->x_codes, config->x_codes_len) >= 0) ||
-        (flags.y_invert && code_idx(event->code, config->y_codes, config->y_codes_len) >= 0)) {
-        event->value = -event->value;
-    }
+    runtime_transform_apply(&event->code, &event->value, &flags, config->x_codes, config->y_codes,
+                            config->x_codes_len);
 
     return ZMK_INPUT_PROC_CONTINUE;
 }
@@ -130,7 +125,7 @@ static int runtime_transform_init(const struct device *dev) {
     const struct runtime_transform_config *config = dev->config;
     struct runtime_transform_data *data = dev->data;
 
-    data->flags = config->defaults;
+    atomic_set(&data->flags, encode_flags(&config->defaults));
 
     return 0;
 }

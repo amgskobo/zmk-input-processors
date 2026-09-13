@@ -1,0 +1,87 @@
+/*
+ * The processors in a real input listener, as a keyboard uses them: a mock
+ * pointer feeds temp layer -> scaler -> transform, and while the layer is up
+ * an override maps Y to the wheel before the same chain runs.
+ *
+ *   t=100  X 37  scaled 889/500 to 65 (remainder 393), inverted     -65/0
+ *                and the layer rises behind it
+ *   t=140  Y 4   on the layer, mapped to the wheel, which the scaler
+ *                and transform leave alone                          scroll 0/4
+ *   t=180  X 1   889 + the carried 393 = 1282, so 2 rather than 1   -2/0
+ *   t=280  silence for the timeout drops the layer
+ */
+
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/kscan_mock.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+
+        base {
+            bindings = <&none &none &none &none>;
+        };
+
+        scroll {
+            bindings = <&trans &trans &trans &trans>;
+        };
+    };
+
+    mock: mock {
+        compatible = "zmk,input-mock";
+        event-startup-delay = <100>;
+        event-period = <40>;
+        events = <INPUT_EV_REL INPUT_REL_X 37 1
+                  INPUT_EV_REL INPUT_REL_Y 4 1
+                  INPUT_EV_REL INPUT_REL_X 1 1>;
+    };
+
+    rt_layer: rt_layer {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <1>;
+        timeout-ms = <100>;
+    };
+
+    rt_scale: rt_scale {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <INPUT_REL_X INPUT_REL_Y>;
+        multiplier = <889>;
+        divisor = <500>;
+        track-remainders;
+    };
+
+    rt_xform: rt_xform {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        x-codes = <INPUT_REL_X>;
+        y-codes = <INPUT_REL_Y>;
+        x-invert;
+    };
+
+    rt_map: rt_map {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        map = <INPUT_REL_Y INPUT_REL_WHEEL>;
+    };
+
+    listener {
+        compatible = "zmk,input-listener";
+        device = <&mock>;
+        input-processors = <&rt_layer &rt_scale &rt_xform>;
+
+        scroll {
+            layers = <1>;
+            input-processors = <&rt_map>;
+            process-next;
+        };
+    };
+};
+
+/* Ends the process once the layer has had time to drop. */
+&kscan {
+    events = <ZMK_MOCK_PRESS(0,0,500) ZMK_MOCK_RELEASE(0,0,10)>;
+};

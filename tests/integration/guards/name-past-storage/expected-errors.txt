@@ -1,0 +1,8 @@
+# scale_no_0123456789abcd: 23 characters and "multiplier"
+static assertion failed: "devicetree node \"scale_no_0123456789abcd\" has a name too long to store its settings under; shorten the node name"
+# xform_no_0123456789abcdef: 25 characters and "x_invert"
+static assertion failed: "devicetree node \"xform_no_0123456789abcdef\" has a name too long to store its settings under; shorten the node name"
+# map_no_0123456789abcdefghi: 26 characters and "enabled"
+static assertion failed: "devicetree node \"map_no_0123456789abcdefghi\" has a name too long to store its settings under; shorten the node name"
+# layer_no_0123456789a: 20 characters and "prior_idle_ms"
+static assertion failed: "devicetree node \"layer_no_0123456789a\" has a name too long to store its settings under; shorten the node name"

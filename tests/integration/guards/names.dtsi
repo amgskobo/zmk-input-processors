@@ -1,0 +1,76 @@
+/*
+ * The settings-name budget. A stored name is "custom_settings/amgskobo__rip/"
+ * and then "<node>.<field>" in 64 bytes, so a node and its processor's longest
+ * field may use 32 characters between them. These nodes sit exactly there and
+ * have to build; each case includes them before the nodes it breaks.
+ *
+ *   scaler      multiplier     22   scale_ok_0123456789abc
+ *   transform   x_invert       24   xform_ok_0123456789abcde
+ *   mapper      enabled        25   map_ok_0123456789abcdefgh
+ *   temp layer  prior_idle_ms  19   layer_ok_0123456789
+ */
+
+#include <behaviors.dtsi>
+#include <physical_layouts.dtsi>
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/matrix_transform.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    physical_layout {
+        compatible = "zmk,physical-layout";
+        display-name = "Test";
+        transform = <&transform>;
+        keys = <&key_physical_attrs 100 100 0 0 0 0 0>,
+               <&key_physical_attrs 100 100 100 0 0 0 0>,
+               <&key_physical_attrs 100 100 0 100 0 0 0>,
+               <&key_physical_attrs 100 100 100 100 0 0 0>;
+    };
+
+    transform: transform {
+        compatible = "zmk,matrix-transform";
+        rows = <2>;
+        columns = <2>;
+        map = <RC(0,0) RC(0,1) RC(1,0) RC(1,1)>;
+    };
+
+    keymap {
+        compatible = "zmk,keymap";
+
+        base {
+            bindings = <&kp A &kp B &kp C &kp D>;
+        };
+    };
+
+    scale_ok_0123456789abc {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <INPUT_REL_X>;
+        multiplier = <1>;
+        divisor = <1>;
+    };
+
+    xform_ok_0123456789abcde {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        x-codes = <INPUT_REL_X>;
+        y-codes = <INPUT_REL_Y>;
+    };
+
+    map_ok_0123456789abcdefgh {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        map = <INPUT_REL_Y INPUT_REL_WHEEL>;
+    };
+
+    layer_ok_0123456789 {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <0>;
+        timeout-ms = <1>;
+    };
+};
+
+&kscan {
+    events = <>;
+};

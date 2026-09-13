@@ -1,0 +1,64 @@
+/*
+ * The keymap and one node exactly at each devicetree limit, shared by the
+ * value cases. Each case includes this before its broken nodes, so these are
+ * checked, and have to build, before a source file stops at the break.
+ */
+
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/keys.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+
+        base {
+            bindings = <&kp A &kp B &kp C &kp D>;
+        };
+
+        second {
+            bindings = <&trans &trans &trans &trans>;
+        };
+    };
+
+    scale_at_ceiling {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <INPUT_REL_X>;
+        multiplier = <32767>;
+        divisor = <32767>;
+    };
+
+    scale_at_floor {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <INPUT_REL_X>;
+        multiplier = <0>;
+        divisor = <1>;
+    };
+
+    xform_paired {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        x-codes = <INPUT_REL_X INPUT_REL_HWHEEL>;
+        y-codes = <INPUT_REL_Y INPUT_REL_WHEEL>;
+    };
+
+    map_paired {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        map = <INPUT_REL_Y INPUT_REL_WHEEL>;
+    };
+
+    layer_last {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <1>;
+        timeout-ms = <60000>;
+        require-prior-idle-ms = <60000>;
+    };
+};
+
+&kscan {
+    events = <>;
+};

@@ -1,0 +1,12 @@
+/* A timeout past the published maximum. */
+
+#include "../values.dtsi"
+
+/ {
+    timeout_over {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <1>;
+        timeout-ms = <60001>;
+    };
+};

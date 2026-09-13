@@ -1,0 +1,2 @@
+PASS: persistence: the first boot starts from devicetree and stores new values
+PASS: persistence: the second boot starts every driver on the stored values

@@ -1,0 +1,2 @@
+# scale_divisor_over: 1/32768
+static assertion failed: "multiplier must be 0-32767 and divisor 1-32767"

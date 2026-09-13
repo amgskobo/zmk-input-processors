@@ -1,0 +1,33 @@
+/* One past the multiplier ceiling, and one past every other driver's guard. */
+
+#include "../values.dtsi"
+
+/ {
+    scale_multiplier_over {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <INPUT_REL_X>;
+        multiplier = <32768>;
+        divisor = <1>;
+    };
+
+    xform_unpaired {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        x-codes = <INPUT_REL_X INPUT_REL_HWHEEL>;
+        y-codes = <INPUT_REL_Y>;
+    };
+
+    map_unpaired {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        map = <INPUT_REL_Y INPUT_REL_WHEEL INPUT_REL_X>;
+    };
+
+    layer_past_end {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <2>;
+        timeout-ms = <1>;
+    };
+};

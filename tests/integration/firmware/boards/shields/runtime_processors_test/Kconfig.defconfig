@@ -1,0 +1,6 @@
+if SHIELD_RUNTIME_PROCESSORS_TEST
+
+config ZMK_KEYBOARD_NAME
+    default "RT Proc Test"
+
+endif

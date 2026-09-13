@@ -41,7 +41,7 @@
  * definition and the string is derived from it, and the registration passes
  * the token through a wrapper so that it expands before being stringified.
  */
-#define ZMK_INPUT_PROCESSORS_SUBSYSTEM_TOKEN amgs_proc
+#define ZMK_INPUT_PROCESSORS_SUBSYSTEM_TOKEN amgskobo__rip
 #define ZMK_INPUT_PROCESSORS_SUBSYSTEM STRINGIFY(ZMK_INPUT_PROCESSORS_SUBSYSTEM_TOKEN)
 
 /*
@@ -102,15 +102,15 @@
  *
  * Pass the processor's longest field; checking the longest checks all of them.
  * The budget a node has is 63 - len("custom_settings/") - len(subsystem) - 1 -
- * len(field) - 1, which with "amgs_proc" and a 13-character field such as
- * "prior_idle_ms" is 23 characters.
+ * len(field) - 1, which with "amgskobo__rip" and a 13-character field such
+ * as "prior_idle_ms" is 19 characters.
  */
 #define ZMK_INPUT_PROCESSORS_ASSERT_NAME_FITS(n, longest_field)                                    \
     BUILD_ASSERT(sizeof(ZMK_INPUT_PROCESSORS_SETTING_KEY(n, longest_field)) <=                     \
                      CONFIG_ZMK_CUSTOM_SETTINGS_KEY_MAX_LEN,                                       \
-                 "devicetree node \"" DT_NODE_FULL_NAME(DT_DRV_INST(n))                            \
-                 "\" has a name too long to key its settings; shorten the node name");             \
-    BUILD_ASSERT(sizeof(ZMK_INPUT_PROCESSORS_STORAGE_NAME(n, longest_field)) <=                    \
-                     SETTINGS_MAX_NAME_LEN,                                                        \
-                 "devicetree node \"" DT_NODE_FULL_NAME(DT_DRV_INST(n))                            \
-                 "\" has a name too long to store its settings under; shorten the node name");
+                 "devicetree node \"" DT_NODE_FULL_NAME(DT_DRV_INST(                               \
+                     n)) "\" has a name too long to key its settings; shorten the node name");     \
+    BUILD_ASSERT(                                                                                  \
+        sizeof(ZMK_INPUT_PROCESSORS_STORAGE_NAME(n, longest_field)) <= SETTINGS_MAX_NAME_LEN,      \
+        "devicetree node \"" DT_NODE_FULL_NAME(DT_DRV_INST(                                        \
+            n)) "\" has a name too long to store its settings under; shorten the node name");
