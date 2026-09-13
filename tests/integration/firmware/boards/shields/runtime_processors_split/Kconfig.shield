@@ -1,0 +1,5 @@
+config SHIELD_RUNTIME_PROCESSORS_SPLIT_LEFT
+    def_bool $(shields_list_contains,runtime_processors_split_left)
+
+config SHIELD_RUNTIME_PROCESSORS_SPLIT_RIGHT
+    def_bool $(shields_list_contains,runtime_processors_split_right)

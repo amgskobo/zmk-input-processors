@@ -1,0 +1,2 @@
+config SHIELD_RUNTIME_PROCESSORS_TEST
+    def_bool $(shields_list_contains,runtime_processors_test)

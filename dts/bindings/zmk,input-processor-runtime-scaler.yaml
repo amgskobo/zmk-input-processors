@@ -1,0 +1,42 @@
+# Copyright (c) 2026 amgskobo
+# SPDX-License-Identifier: MIT
+
+description: |
+  Scales relative pointer events by a ratio held on the node.
+
+  Unlike zmk,input-processor-scaler the ratio is a property rather than a pair
+  of chain parameter cells, so it names a value a client can change while the
+  keyboard runs, and the arithmetic is done in 64 bits, so a large multiplier
+  cannot turn a fast movement backwards.
+
+compatible: "zmk,input-processor-runtime-scaler"
+
+include: ip_zero_param.yaml
+
+properties:
+  type:
+    type: int
+    default: 2
+    description: >-
+      Event type to act on, from
+      zephyr/dt-bindings/input/input-event-codes.h. The default is INPUT_EV_REL
+      (2).
+  codes:
+    type: array
+    required: true
+    description: >-
+      Event codes to scale. Codes not listed here pass through untouched.
+  multiplier:
+    type: int
+    required: true
+    description: >-
+      Numerator of the ratio, 0 to 32767. This is the starting value; the
+      running value can be changed at runtime. Zero is how a chain kills one
+      axis, scaling it by 0/1 rather than carrying a processor to drop it.
+  divisor:
+    type: int
+    required: true
+    description: >-
+      Denominator of the ratio, 1 to 32767. Together with multiplier a value of
+      889/500 means 1.778x. The bound is what keeps the tracked remainder
+      inside the int16_t slot ZMK provides for it.

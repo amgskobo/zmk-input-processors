@@ -1,0 +1,13 @@
+/* A negative multiplier, which only the devicetree form of the check can see. */
+
+#include "../values.dtsi"
+
+/ {
+    scale_multiplier_negative {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <INPUT_REL_X>;
+        multiplier = <(-1)>;
+        divisor = <1>;
+    };
+};

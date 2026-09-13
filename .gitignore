@@ -1,0 +1,4 @@
+build/
+.west/
+*.uf2
+tests/test_runtime_scaler

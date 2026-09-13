@@ -1,0 +1,3 @@
+/^PASS: /p
+/^FAIL: /p
+s/.*hid_mouse_//p

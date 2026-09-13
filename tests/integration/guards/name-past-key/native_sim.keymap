@@ -1,0 +1,17 @@
+/*
+ * 37 characters: "multiplier" no longer fits the 48-byte key custom-settings
+ * accepts. The key is checked before the stored name, and before the setting
+ * is defined, so the build stops at the message that names the node.
+ */
+
+#include "../names.dtsi"
+
+/ {
+    scale_key_0123456789abcdefghij0123456 {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <INPUT_REL_X>;
+        multiplier = <1>;
+        divisor = <1>;
+    };
+};

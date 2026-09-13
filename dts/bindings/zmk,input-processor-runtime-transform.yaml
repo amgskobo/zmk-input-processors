@@ -1,0 +1,44 @@
+# Copyright (c) 2026 amgskobo
+# SPDX-License-Identifier: MIT
+
+description: |
+  Swaps and inverts pointer axes, with the orientation held on the node.
+
+  Unlike zmk,input-processor-transform the three flags are named properties
+  rather than bits of a chain parameter cell, so each one is a value a client
+  can list and change while the keyboard runs. A trackpad mounted the other
+  way up is then a checkbox rather than a rebuild.
+
+compatible: "zmk,input-processor-runtime-transform"
+
+include: ip_zero_param.yaml
+
+properties:
+  type:
+    type: int
+    default: 2
+    description: >-
+      Event type to act on, from
+      zephyr/dt-bindings/input/input-event-codes.h. The default is INPUT_EV_REL
+      (2).
+  x-codes:
+    type: array
+    required: true
+    description: >-
+      Codes travelling on the X axis. Paired with y-codes by index, which is
+      how a swap knows what to exchange, so the two must be the same length.
+  y-codes:
+    type: array
+    required: true
+    description: Codes travelling on the Y axis. Same length as x-codes.
+  xy-swap:
+    type: boolean
+    description: >-
+      Starting state: exchange the X and Y codes. Applied before either
+      inversion, so an inversion acts on the axis an event ends up on.
+  x-invert:
+    type: boolean
+    description: "Starting state: negate values travelling on the X axis."
+  y-invert:
+    type: boolean
+    description: "Starting state: negate values travelling on the Y axis."

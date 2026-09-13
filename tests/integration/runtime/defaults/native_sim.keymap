@@ -1,0 +1,82 @@
+/*
+ * The ready-made nodes from input_processor_runtime.dtsi, referenced the way a
+ * board references them, with their settings published: every one has to
+ * build with keys that fit, start at the defaults the README documents, and
+ * carry events as documented.
+ *
+ *   t=100  pointer X 5    xy scaler 1/1, xy transform none     5/0
+ *   t=120  pointer Y -4                                         0/-4
+ *   t=200  scroll Y 3     mapped to WHEEL, scroll scaler 1/1,
+ *                         scroll transform none                 scroll 0/3
+ *   t=220  scroll X 2     mapped to HWHEEL                      scroll 2/0
+ */
+
+#include <behaviors.dtsi>
+#include <physical_layouts.dtsi>
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/kscan_mock.h>
+#include <dt-bindings/zmk/matrix_transform.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zmk-input-processors/input_processor_runtime.dtsi>
+
+/ {
+    physical_layout {
+        compatible = "zmk,physical-layout";
+        display-name = "Test";
+        transform = <&transform>;
+        keys = <&key_physical_attrs 100 100 0 0 0 0 0>,
+               <&key_physical_attrs 100 100 100 0 0 0 0>,
+               <&key_physical_attrs 100 100 0 100 0 0 0>,
+               <&key_physical_attrs 100 100 100 100 0 0 0>;
+    };
+
+    transform: transform {
+        compatible = "zmk,matrix-transform";
+        rows = <2>;
+        columns = <2>;
+        map = <RC(0,0) RC(0,1) RC(1,0) RC(1,1)>;
+    };
+
+    keymap {
+        compatible = "zmk,keymap";
+
+        base {
+            bindings = <&none &none &none &none>;
+        };
+    };
+
+    pointer_mock: pointer_mock {
+        compatible = "zmk,input-mock";
+        event-startup-delay = <100>;
+        event-period = <20>;
+        events = <INPUT_EV_REL INPUT_REL_X 5 1
+                  INPUT_EV_REL INPUT_REL_Y (-4) 1>;
+    };
+
+    scroll_mock: scroll_mock {
+        compatible = "zmk,input-mock";
+        event-startup-delay = <200>;
+        event-period = <20>;
+        events = <INPUT_EV_REL INPUT_REL_Y 3 1
+                  INPUT_EV_REL INPUT_REL_X 2 1>;
+    };
+
+    pointer_listener {
+        compatible = "zmk,input-listener";
+        device = <&pointer_mock>;
+        input-processors = <&zip_runtime_xy_scaler &zip_runtime_xy_transform
+                            &zip_runtime_temp_layer>;
+    };
+
+    scroll_listener {
+        compatible = "zmk,input-listener";
+        device = <&scroll_mock>;
+        input-processors = <&zip_runtime_scroll_mapper &zip_runtime_scroll_scaler
+                            &zip_runtime_scroll_transform>;
+    };
+};
+
+/* Ends the process after both mocks have finished. */
+&kscan {
+    events = <ZMK_MOCK_PRESS(0,0,500) ZMK_MOCK_RELEASE(0,0,10)>;
+};

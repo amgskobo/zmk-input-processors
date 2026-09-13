@@ -1,0 +1,2 @@
+# scale_key_0123456789abcdefghij0123456: 37 characters and "multiplier" make a 49-byte key
+static assertion failed: "devicetree node \"scale_key_0123456789abcdefghij0123456\" has a name too long to key its settings; shorten the node name"

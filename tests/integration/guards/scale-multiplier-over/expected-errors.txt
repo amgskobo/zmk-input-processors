@@ -1,0 +1,8 @@
+# scale_multiplier_over: 32768/1
+static assertion failed: "multiplier must be 0-32767 and divisor 1-32767"
+# xform_unpaired: two X codes, one Y code
+static assertion failed: "x-codes and y-codes must be the same length: a swap pairs them by index"
+# map_unpaired: three entries
+static assertion failed: "map is a list of from/to pairs, so it needs an even number of entries"
+# layer_past_end: layer 2 of a two-layer keymap
+static assertion failed: "layer must name a layer this keymap has"

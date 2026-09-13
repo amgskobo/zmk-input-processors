@@ -1,0 +1,12 @@
+/* A negative timeout. */
+
+#include "../values.dtsi"
+
+/ {
+    timeout_negative {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <1>;
+        timeout-ms = <(-1)>;
+    };
+};

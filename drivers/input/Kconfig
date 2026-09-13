@@ -1,12 +1,62 @@
 # Copyright (c) 2022 The ZMK Contributors
 # SPDX-License-Identifier: MIT
 
-DT_COMPAT_ZMK_INPUT_PROCESSOR_ABSOLUTE_TO_RELATIVE := zmk,input-processor-absolute-to-relative
+# The runtime processors. Each one keeps the parameters its upstream
+# counterpart holds in rodata in RAM instead, and names them on the node, so
+# they can be listed and changed while the keyboard runs. Selected by the
+# devicetree, so a board that declares no such node compiles none of them.
+#
+# RUNTIME is not redundant with the module name, however much it looks it.
+# Upstream already owns ZMK_INPUT_PROCESSOR_SCALER, _TRANSFORM, _CODE_MAPPER
+# and _TEMP_LAYER, and Kconfig merges two definitions of one symbol rather
+# than refusing them: dropping RUNTIME here makes declaring one of these nodes
+# also enable upstream's driver, which then compiles into the image with no
+# instances. The build succeeds. The only sign is an unused-variable warning
+# in a ZMK source file. The compatible strings cannot drop it either, for the
+# louder reason that two bindings sharing a compatible is a hard error.
 
-config ZMK_INPUT_PROCESSOR_ABSOLUTE_TO_RELATIVE
-		bool
-		default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_ABSOLUTE_TO_RELATIVE))
-		depends on ZMK_POINTING
-        depends on (!ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL)
+DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_SCALER := zmk,input-processor-runtime-scaler
 
+config ZMK_INPUT_PROCESSOR_RUNTIME_SCALER
+	bool
+	default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_SCALER))
+	depends on ZMK_POINTING
 
+DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TRANSFORM := zmk,input-processor-runtime-transform
+
+config ZMK_INPUT_PROCESSOR_RUNTIME_TRANSFORM
+	bool
+	default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TRANSFORM))
+	depends on ZMK_POINTING
+
+DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_CODE_MAPPER := zmk,input-processor-runtime-code-mapper
+
+config ZMK_INPUT_PROCESSOR_RUNTIME_CODE_MAPPER
+	bool
+	default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_CODE_MAPPER))
+	depends on ZMK_POINTING
+
+DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TEMP_LAYER := zmk,input-processor-runtime-temp-layer
+
+config ZMK_INPUT_PROCESSOR_RUNTIME_TEMP_LAYER
+	bool
+	default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TEMP_LAYER))
+	depends on ZMK_POINTING
+	depends on !ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL
+
+config ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS
+	bool "Publish input processor parameters through zmk-feature-custom-settings"
+	# Not ZMK_CUSTOM_SETTINGS: registering a subsystem needs zmk/studio/custom.h,
+	# which includes ZMK's nanopb-generated proto/zmk/custom.pb.h. That is only
+	# generated when the Studio RPC is being built, so the base registry alone
+	# would let this be selected and then fail on a missing header.
+	depends on ZMK_CUSTOM_SETTINGS_STUDIO_RPC
+	help
+	  Registers this module's processor parameters in the cross-module custom
+	  settings registry, so a Studio client lists and edits them with no page
+	  of its own: the declared type and range drive the widget. The registry
+	  then owns persistence, and the drivers store nothing, so there is one
+	  owner for each value. Needs zmk-feature-custom-settings, and so the
+	  patched ZMK that carries the custom Studio RPC protocol; with this off,
+	  which is the default and what an upstream ZMK build gets, none of it is
+	  compiled and the devicetree values are fixed.

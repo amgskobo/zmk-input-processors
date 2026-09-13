@@ -1,0 +1,18 @@
+PASS: scaler: applies the devicetree ratio to the codes it names
+PASS: scaler: carries a remainder only through the listener's slot
+PASS: scaler: refuses an invalid ratio and keeps the old one
+PASS: transform: applies the devicetree flags, swapping before inverting
+PASS: code mapper: rewrites while enabled and passes through while disabled
+PASS: temp layer: reports its devicetree parameters and refuses a bad layer
+PASS: temp layer: movement raises the layer and silence drops it
+PASS: temp layer: an excluded key keeps the layer and any other key drops it
+PASS: temp layer: a recent key press keeps the layer from rising
+PASS: temp layer: forgets a layer dropped elsewhere instead of dropping it again
+PASS: temp layer: keeps holding a locked layer it could not drop, until it is unlocked
+PASS: temp layer: switching it off drops a held layer and raises nothing
+PASS: temp layer: switching off cancels an activation already queued
+PASS: temp layer: a parameter update discards an activation already queued
+PASS: temp layer: a runtime timeout update replaces the pending deadline
+PASS: temp layer: a new layer number applies from the next activation
+PASS: temp layer: with no timeout and no exclusions the layer holds until switched off
+PASS: temp layer: starting disabled raises nothing

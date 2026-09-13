@@ -1,0 +1,11 @@
+Duplicate setting key "rt_twin.divisor"
+Duplicate setting key "rt_twin.multiplier"
+PASS: settings: the subsystem is registered under the same name and refuses calls
+PASS: settings: every parameter is published with its type, default and range
+PASS: settings: two nodes sharing a name publish one key twice
+PASS: settings: a written ratio reaches the scaler
+PASS: settings: a value outside its declared range never reaches a driver
+PASS: settings: written orientation flags reach the transform
+PASS: settings: the written switch reaches the code mapper
+PASS: settings: written temp layer values reach the driver, and off drops the layer
+PASS: settings: stored values are applied again when settings finish loading

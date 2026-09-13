@@ -1,0 +1,13 @@
+/* A prior-idle guard past the published maximum. */
+
+#include "../values.dtsi"
+
+/ {
+    prior_idle_over {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <1>;
+        timeout-ms = <1>;
+        require-prior-idle-ms = <60001>;
+    };
+};

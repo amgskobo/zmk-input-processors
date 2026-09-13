@@ -1,0 +1,12 @@
+/* A negative layer ID. */
+
+#include "../values.dtsi"
+
+/ {
+    layer_negative {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <(-1)>;
+        timeout-ms = <1>;
+    };
+};

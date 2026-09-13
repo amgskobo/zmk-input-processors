@@ -1,0 +1,86 @@
+/*
+ * Shared by both halves, the way a split keyboard shares its devicetree: the
+ * processors and the listener that uses them are declared on both, and only
+ * the central half enables the listener. The peripheral half forwards its
+ * input through the split and runs none of them.
+ */
+
+#include <physical_layouts.dtsi>
+#include <dt-bindings/zmk/matrix_transform.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    chosen {
+        zmk,kscan = &split_kscan;
+        zmk,physical-layout = &split_layout;
+    };
+
+    split_kscan: split_kscan {
+        compatible = "zmk,kscan-mock";
+        rows = <1>;
+        columns = <1>;
+        events = <>;
+    };
+
+    split_transform: split_transform {
+        compatible = "zmk,matrix-transform";
+        rows = <1>;
+        columns = <2>;
+        map = <RC(0,0) RC(0,1)>;
+    };
+
+    split_layout: split_layout {
+        compatible = "zmk,physical-layout";
+        display-name = "Split";
+        transform = <&split_transform>;
+        keys = <&key_physical_attrs 100 100 0 0 0 0 0>,
+               <&key_physical_attrs 100 100 100 0 0 0 0>;
+    };
+
+    rt_split_scale: rt_split_scale {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <INPUT_REL_X INPUT_REL_Y>;
+        multiplier = <1>;
+        divisor = <1>;
+        track-remainders;
+    };
+
+    rt_split_xform: rt_split_xform {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        x-codes = <INPUT_REL_X>;
+        y-codes = <INPUT_REL_Y>;
+    };
+
+    rt_split_map: rt_split_map {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        map = <INPUT_REL_Y INPUT_REL_WHEEL>;
+        start-disabled;
+    };
+
+    rt_split_layer: rt_split_layer {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <1>;
+        timeout-ms = <400>;
+    };
+
+    splits {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        split_input: split_input@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
+    };
+
+    split_listener: split_listener {
+        compatible = "zmk,input-listener";
+        status = "disabled";
+        device = <&split_input>;
+        input-processors = <&rt_split_layer &rt_split_scale &rt_split_xform &rt_split_map>;
+    };
+};

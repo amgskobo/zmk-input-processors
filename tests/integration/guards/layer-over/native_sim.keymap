@@ -1,0 +1,12 @@
+/* The keymap has layers 0 and 1, so 2 is past its last layer ID. */
+
+#include "../values.dtsi"
+
+/ {
+    layer_over {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <2>;
+        timeout-ms = <1>;
+    };
+};

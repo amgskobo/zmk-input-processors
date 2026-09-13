@@ -1,3 +1,7 @@
+# Copyright (c) 2026 amgskobo
+# SPDX-License-Identifier: MIT
+
+name: zmk-input-processors
 build:
   cmake: .
   kconfig: Kconfig

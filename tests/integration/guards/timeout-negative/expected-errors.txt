@@ -1,0 +1,2 @@
+# timeout_negative: -1
+static assertion failed: "timeout-ms must be 0-60000"

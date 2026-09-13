@@ -1,0 +1,19 @@
+/* The peripheral half forwards a pointer through the split and runs nothing. */
+
+#include "runtime_processors_split.dtsi"
+
+/ {
+    split_pointer: split_pointer {
+        compatible = "zmk,input-mock";
+        event-period = <100>;
+        events = <INPUT_EV_REL INPUT_REL_X 1 1>;
+    };
+};
+
+&split_transform {
+    col-offset = <1>;
+};
+
+&split_input {
+    device = <&split_pointer>;
+};

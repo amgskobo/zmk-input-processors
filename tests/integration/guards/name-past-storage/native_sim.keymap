@@ -1,0 +1,33 @@
+/* One character past the stored-name budget, for every processor. */
+
+#include "../names.dtsi"
+
+/ {
+    scale_no_0123456789abcd {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <INPUT_REL_X>;
+        multiplier = <1>;
+        divisor = <1>;
+    };
+
+    xform_no_0123456789abcdef {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        x-codes = <INPUT_REL_X>;
+        y-codes = <INPUT_REL_Y>;
+    };
+
+    map_no_0123456789abcdefghi {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        map = <INPUT_REL_Y INPUT_REL_WHEEL>;
+    };
+
+    layer_no_0123456789a {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <0>;
+        timeout-ms = <1>;
+    };
+};
