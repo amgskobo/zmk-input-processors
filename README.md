@@ -415,8 +415,9 @@ raise". So the switch is explicit, and switching it off drops a layer this
 processor is currently holding rather than leaving it up with nothing left
 responsible for lowering it.
 
-Activation is queued onto the system work queue rather than performed from
-inside the input callback. The worker rechecks the current enabled state and
+Activation and timeout handling run on ZMK's low-priority work queue rather
+than inside the input callback or on Zephyr's shared system work queue. The
+worker rechecks the current enabled state and
 typing guard before raising anything; disabling the processor or receiving a
 disqualifying key press also invalidates a queued activation. A stale work item
 therefore cannot raise the layer after the event that cancelled it.

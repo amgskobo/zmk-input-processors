@@ -44,6 +44,7 @@
 #include <zmk/events/layer_state_changed.h>
 #include <zmk/events/position_state_changed.h>
 #include <zmk/keymap.h>
+#include <zmk/workqueue.h>
 
 #include <zmk-input-processors/runtime_temp_layer.h>
 #include <zmk-input-processors/runtime_temp_layer_policy.h>
@@ -114,9 +115,12 @@ static void set_layer_locked(struct runtime_temp_layer_data *data, bool activate
 }
 
 /*
- * Raising and dropping happen on the system work queue rather than in the
- * input callback: activating a layer raises events of its own, and doing that
- * from inside event handling is how a processor ends up re-entering itself.
+ * Raising and dropping happen on ZMK's low-priority work queue rather than in
+ * the input callback: activating a layer raises events of its own, and doing
+ * that from inside event handling is how a processor ends up re-entering
+ * itself. Keeping these callbacks off Zephyr's shared system work queue also
+ * prevents a layer listener from delaying Bluetooth, split, watchdog, or
+ * device-PM work.
  */
 static void activate_work_cb(struct k_work *work) {
     struct runtime_temp_layer_data *data =
@@ -156,7 +160,8 @@ static void deactivate_work_cb(struct k_work *work) {
         const int64_t remaining = data->deactivate_at - k_uptime_get();
 
         if (remaining > 0) {
-            k_work_reschedule(&data->deactivate_work, K_MSEC(remaining));
+            k_work_reschedule_for_queue(zmk_workqueue_lowprio_work_q(),
+                                        &data->deactivate_work, K_MSEC(remaining));
         } else {
             data->deactivate_at = 0;
             set_layer_locked(data, false);
@@ -228,9 +233,11 @@ int runtime_temp_layer_set_params(const struct device *dev,
     }
 
     if (release_held_layer) {
-        k_work_reschedule(&data->deactivate_work, K_NO_WAIT);
+        k_work_reschedule_for_queue(zmk_workqueue_lowprio_work_q(), &data->deactivate_work,
+                                    K_NO_WAIT);
     } else if (restart_timeout) {
-        k_work_reschedule(&data->deactivate_work, K_MSEC(params->timeout_ms));
+        k_work_reschedule_for_queue(zmk_workqueue_lowprio_work_q(), &data->deactivate_work,
+                                    K_MSEC(params->timeout_ms));
     } else {
         k_work_cancel_delayable(&data->deactivate_work);
     }
@@ -413,13 +420,14 @@ static int runtime_temp_layer_handle_event(const struct device *dev, struct inpu
     if (runtime_temp_layer_should_activate(params.enabled, data->is_active, typing)) {
         data->active_layer = params.layer;
         data->activation_pending = true;
-        k_work_submit(&data->activate_work);
+        k_work_submit_to_queue(zmk_workqueue_lowprio_work_q(), &data->activate_work);
     }
 
     if (runtime_temp_layer_should_schedule_timeout(&params)) {
         data->deactivate_at = k_uptime_get() + params.timeout_ms;
         data->force_deactivate = false;
-        k_work_reschedule(&data->deactivate_work, K_MSEC(params.timeout_ms));
+        k_work_reschedule_for_queue(zmk_workqueue_lowprio_work_q(), &data->deactivate_work,
+                                    K_MSEC(params.timeout_ms));
     }
 
     k_mutex_unlock(&data->lock);
