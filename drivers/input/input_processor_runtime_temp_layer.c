@@ -291,14 +291,15 @@ static int handle_position_state_changed(const struct device *dev,
         return ZMK_EV_EVENT_BUBBLE;
     }
 
+    const bool excluded = position_is_excluded(config, ev->position);
+
     if (runtime_temp_layer_should_drop_for_position(data->is_active, ev->state,
-                                                    config->num_positions > 0,
-                                                    position_is_excluded(config, ev->position))) {
+                                                    config->num_positions > 0, excluded)) {
         set_layer_locked(data, false);
         data->deactivate_at = 0;
         data->force_deactivate = false;
         k_work_cancel_delayable(&data->deactivate_work);
-    } else if (!position_is_excluded(config, ev->position)) {
+    } else if (!excluded) {
         /* Do not let queued work raise the layer after a disqualifying press. */
         data->activation_pending = false;
     }
