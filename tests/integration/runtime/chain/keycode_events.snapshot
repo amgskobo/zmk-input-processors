@@ -1,8 +1,8 @@
-layer_changed: layer 1 state 1 locked 0
-rt_layer: layer 1 raised
 movement_set: Mouse movement set to -65/0
 scroll_set: Mouse scroll set to 0/0
 movement_set: Mouse movement set to 0/0
+layer_changed: layer 1 state 1 locked 0
+rt_layer: layer 1 raised
 scroll_set: Mouse scroll set to 0/4
 scroll_set: Mouse scroll set to 0/0
 movement_set: Mouse movement set to 0/0

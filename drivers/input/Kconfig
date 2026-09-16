@@ -1,4 +1,4 @@
-# Copyright (c) 2022 The ZMK Contributors
+# Copyright (c) 2026 amgskobo
 # SPDX-License-Identifier: MIT
 
 # The runtime processors. Each one keeps the parameters its upstream
@@ -43,6 +43,7 @@ config ZMK_INPUT_PROCESSOR_RUNTIME_TEMP_LAYER
 	default $(dt_compat_enabled,$(DT_COMPAT_ZMK_INPUT_PROCESSOR_RUNTIME_TEMP_LAYER))
 	depends on ZMK_POINTING
 	depends on !ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL
+	select ZMK_LOW_PRIORITY_WORK_QUEUE
 
 config ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS
 	bool "Publish input processor parameters through zmk-feature-custom-settings"
