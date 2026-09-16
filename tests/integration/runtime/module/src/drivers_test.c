@@ -23,6 +23,7 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/position_state_changed.h>
 #include <zmk/keymap.h>
+#include <zmk/workqueue.h>
 
 #include <zmk-input-processors/runtime_code_mapper.h>
 #include <zmk-input-processors/runtime_scaler.h>
@@ -508,7 +509,9 @@ static void test_temp_layer_switch_off_while_activation_is_queued(void) {
     struct runtime_temp_layer_params params = {0};
 
     settle();
-    RT_EXPECT_EQ(&t, k_work_submit(&work_block) < 0, false, "queue the work blocker");
+    RT_EXPECT_EQ(&t,
+                 k_work_submit_to_queue(zmk_workqueue_lowprio_work_q(), &work_block) < 0, false,
+                 "queue the work blocker");
     RT_EXPECT_EQ(&t, k_sem_take(&work_block_started, K_FOREVER), 0, "work queue is blocked");
 
     queue_move(layer);
@@ -532,7 +535,9 @@ static void test_temp_layer_update_while_activation_is_queued(void) {
     struct runtime_temp_layer_params params = {0};
 
     settle();
-    RT_EXPECT_EQ(&t, k_work_submit(&work_block) < 0, false, "queue the work blocker");
+    RT_EXPECT_EQ(&t,
+                 k_work_submit_to_queue(zmk_workqueue_lowprio_work_q(), &work_block) < 0, false,
+                 "queue the work blocker");
     RT_EXPECT_EQ(&t, k_sem_take(&work_block_started, K_FOREVER), 0, "work queue is blocked");
 
     queue_move(layer);

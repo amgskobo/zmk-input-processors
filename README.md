@@ -420,7 +420,10 @@ than inside the input callback or on Zephyr's shared system work queue. The
 worker rechecks the current enabled state and
 typing guard before raising anything; disabling the processor or receiving a
 disqualifying key press also invalidates a queued activation. A stale work item
-therefore cannot raise the layer after the event that cancelled it.
+therefore cannot raise the layer after the event that cancelled it. Parameter
+updates also advance a generation counter before waiting for the worker lock;
+the worker checks it before and after activation and immediately undoes an
+activation if an edit arrived while layer events were being dispatched.
 
 `excluded-positions` stays structural. A list of key positions is not something
 a generic settings list can draw, and it belongs to the physical layout rather
