@@ -21,13 +21,17 @@
 
 struct device;
 
-/* Reads whether the map is being applied right now. */
+/*
+ * Reads whether the map is being applied right now. Returns -ENODEV when dev is
+ * not a runtime code mapper instance.
+ */
 int runtime_code_mapper_get_enabled(const struct device *dev, bool *out);
 
 /*
  * Turns the map on or off. Disabled, every event passes through with its code
  * unchanged; the processor is a no-op rather than absent, so the chain keeps
  * its shape and the stage can be switched back without rebuilding anything.
+ * Returns -ENODEV when dev is not a runtime code mapper instance.
  *
  * Nothing is persisted here; that is the settings layer's job, which is what
  * keeps this driver free of a second owner for the same value.

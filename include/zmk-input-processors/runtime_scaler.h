@@ -17,13 +17,17 @@
 
 #include <zmk-input-processors/runtime_scaler_math.h>
 
-/* Reads the ratio the processor is applying right now. */
+/*
+ * Reads the ratio the processor is applying right now. Returns -ENODEV when dev
+ * is not a runtime scaler instance.
+ */
 int runtime_scaler_get_params(const struct device *dev, uint32_t *multiplier, uint32_t *divisor);
 
 /*
  * Applies a new ratio. Returns -EINVAL and changes nothing when either number
  * is outside the range runtime_scaler_params_valid() accepts, so a bad value from
- * a client cannot take a processor out of service.
+ * a client cannot take a processor out of service, and -ENODEV when dev is not a
+ * runtime scaler instance.
  *
  * Nothing is persisted here. A processor holds the value it was last given
  * and the devicetree value after a reboot; storing it across one is the

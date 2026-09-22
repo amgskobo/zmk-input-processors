@@ -10,8 +10,8 @@
  *    host test can pin it. The stock scaler holds `event->value * multiplier`
  *    in an int16_t, so a multiplier of 889 turns any delta of 37 or more
  *    negative before it is divided -- the pointer reverses exactly when it is
- *    moving fastest. Cormoran's Runtime Input Processor inherited the same
- *    expression.
+ *    moving fastest. A runtime scaler that copies the expression inherits the
+ *    same reversal.
  *
  * 2. The ratio lives on the node instead of in the chain's parameter cells,
  *    and in RAM rather than rodata, so it can be changed while the keyboard
@@ -55,9 +55,14 @@ static void decode_ratio(atomic_val_t encoded, uint32_t *multiplier, uint32_t *d
     *divisor = ratio & UINT16_MAX;
 }
 
+static bool runtime_scaler_device_valid(const struct device *dev);
+
 int runtime_scaler_get_params(const struct device *dev, uint32_t *multiplier, uint32_t *divisor) {
     if (dev == NULL || multiplier == NULL || divisor == NULL) {
         return -EINVAL;
+    }
+    if (!runtime_scaler_device_valid(dev)) {
+        return -ENODEV;
     }
 
     struct runtime_scaler_data *data = dev->data;
@@ -70,6 +75,9 @@ int runtime_scaler_get_params(const struct device *dev, uint32_t *multiplier, ui
 int runtime_scaler_set_params(const struct device *dev, uint32_t multiplier, uint32_t divisor) {
     if (dev == NULL) {
         return -EINVAL;
+    }
+    if (!runtime_scaler_device_valid(dev)) {
+        return -ENODEV;
     }
 
     if (!runtime_scaler_params_valid(multiplier, divisor)) {
@@ -158,3 +166,20 @@ static const struct zmk_input_processor_driver_api runtime_scaler_driver_api = {
                           CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &runtime_scaler_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(RUNTIME_SCALER_INST)
+
+#define RUNTIME_SCALER_DEVICE_REF(n) DEVICE_DT_INST_GET(n),
+
+/* The runtime API reads dev->data as this driver's data, so it accepts only the
+ * devices this driver defined. */
+static const struct device *const runtime_scaler_devices[] = {
+    DT_INST_FOREACH_STATUS_OKAY(RUNTIME_SCALER_DEVICE_REF)};
+
+static bool runtime_scaler_device_valid(const struct device *dev) {
+    for (size_t i = 0U; i < ARRAY_SIZE(runtime_scaler_devices); i++) {
+        if (runtime_scaler_devices[i] == dev) {
+            return true;
+        }
+    }
+
+    return false;
+}

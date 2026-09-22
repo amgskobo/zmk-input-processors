@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ */
+
 /* The keymap has layers 0 and 1, so 2 is past its last layer ID. */
 
 #include "../values.dtsi"

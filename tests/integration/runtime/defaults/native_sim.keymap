@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
  * The ready-made nodes from input_processor_runtime.dtsi, referenced the way a
  * board references them, with their settings published: every one has to
  * build with keys that fit, start at the defaults the README documents, and

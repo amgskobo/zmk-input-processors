@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
  * One instance of each processor with its settings published, for the settings
  * self-tests, plus two scalers that share a node name under different parents:
  * the collision the boot-time duplicate check exists to report.

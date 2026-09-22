@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ */
+
 /* The central half runs the listener, and so the processors. */
 
 #include "runtime_processors_split.dtsi"

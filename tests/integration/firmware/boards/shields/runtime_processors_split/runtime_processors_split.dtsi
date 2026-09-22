@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
  * Shared by both halves, the way a split keyboard shares its devicetree: the
  * processors and the listener that uses them are declared on both, and only
  * the central half enables the listener. The peripheral half forwards its

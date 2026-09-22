@@ -70,9 +70,14 @@ static struct runtime_transform_flags decode_flags(atomic_val_t encoded) {
     };
 }
 
+static bool runtime_transform_device_valid(const struct device *dev);
+
 int runtime_transform_get_flags(const struct device *dev, struct runtime_transform_flags *out) {
     if (dev == NULL || out == NULL) {
         return -EINVAL;
+    }
+    if (!runtime_transform_device_valid(dev)) {
+        return -ENODEV;
     }
 
     struct runtime_transform_data *data = dev->data;
@@ -86,6 +91,9 @@ int runtime_transform_set_flags(const struct device *dev,
                                 const struct runtime_transform_flags *flags) {
     if (dev == NULL || flags == NULL) {
         return -EINVAL;
+    }
+    if (!runtime_transform_device_valid(dev)) {
+        return -ENODEV;
     }
 
     struct runtime_transform_data *data = dev->data;
@@ -159,3 +167,20 @@ static const struct zmk_input_processor_driver_api runtime_transform_driver_api 
                           CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &runtime_transform_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TRANSFORM_INST)
+
+#define RUNTIME_TRANSFORM_DEVICE_REF(n) DEVICE_DT_INST_GET(n),
+
+/* The runtime API reads dev->data as this driver's data, so it accepts only the
+ * devices this driver defined. */
+static const struct device *const runtime_transform_devices[] = {
+    DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TRANSFORM_DEVICE_REF)};
+
+static bool runtime_transform_device_valid(const struct device *dev) {
+    for (size_t i = 0U; i < ARRAY_SIZE(runtime_transform_devices); i++) {
+        if (runtime_transform_devices[i] == dev) {
+            return true;
+        }
+    }
+
+    return false;
+}

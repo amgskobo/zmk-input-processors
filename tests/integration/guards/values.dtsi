@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
  * The keymap and one node exactly at each devicetree limit, shared by the
  * value cases. Each case includes this before its broken nodes, so these are
  * checked, and have to build, before a source file stops at the break.

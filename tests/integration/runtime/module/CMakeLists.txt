@@ -1,3 +1,6 @@
+# Copyright (c) 2026 amgskobo
+# SPDX-License-Identifier: MIT
+
 # Self-tests for the runtime suite. They go on the app target, like the
 # module's own settings sources, so ZMK's and custom-settings' headers resolve.
 

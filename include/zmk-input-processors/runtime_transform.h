@@ -28,14 +28,18 @@ struct runtime_transform_flags {
     bool y_invert;
 };
 
-/* Reads the orientation the processor is applying right now. */
+/*
+ * Reads the orientation the processor is applying right now. Returns -ENODEV
+ * when dev is not a runtime transform instance.
+ */
 int runtime_transform_get_flags(const struct device *dev, struct runtime_transform_flags *out);
 
 /*
  * Applies a new orientation. All three move together: a client that set them
  * one at a time would otherwise send the pointer through an orientation
  * nobody chose, and on a swap plus an invert that is a visibly wrong
- * direction rather than a rounding difference.
+ * direction rather than a rounding difference. Returns -ENODEV when dev is not
+ * a runtime transform instance.
  *
  * Nothing is persisted here; that is the settings layer's job, which is what
  * keeps this driver free of a second owner for the same value.

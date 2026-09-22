@@ -200,6 +200,10 @@ static void test_scaler_validation(void) {
                  "read with no device");
     RT_EXPECT_EQ(&t, runtime_scaler_get_params(scale, NULL, &divisor), -EINVAL, "no multiplier");
     RT_EXPECT_EQ(&t, runtime_scaler_get_params(scale, &multiplier, NULL), -EINVAL, "no divisor");
+    RT_EXPECT_EQ(&t, runtime_scaler_set_params(xform, 1, 1), -ENODEV,
+                 "another driver's device");
+    RT_EXPECT_EQ(&t, runtime_scaler_get_params(xform, &multiplier, &divisor), -ENODEV,
+                 "read another driver's device");
 
     /* Both ends of the accepted range take effect. */
     RT_EXPECT_EQ(&t, runtime_scaler_set_params(scale, 0, 1), 0, "zero multiplier");
@@ -265,6 +269,10 @@ static void test_transform(void) {
     RT_EXPECT_EQ(&t, runtime_transform_set_flags(NULL, &flags), -EINVAL, "no device");
     RT_EXPECT_EQ(&t, runtime_transform_get_flags(xform, NULL), -EINVAL, "no flags to read into");
     RT_EXPECT_EQ(&t, runtime_transform_get_flags(NULL, &read), -EINVAL, "read with no device");
+    RT_EXPECT_EQ(&t, runtime_transform_set_flags(scale, &flags), -ENODEV,
+                 "another driver's device");
+    RT_EXPECT_EQ(&t, runtime_transform_get_flags(scale, &read), -ENODEV,
+                 "read another driver's device");
 
     flags.xy_swap = false;
     RT_EXPECT_EQ(&t, runtime_transform_set_flags(xform, &flags), 0, "restore");
@@ -316,6 +324,10 @@ static void test_code_mapper(void) {
     RT_EXPECT_EQ(&t, runtime_code_mapper_set_enabled(NULL, true), -EINVAL, "no device");
     RT_EXPECT_EQ(&t, runtime_code_mapper_get_enabled(NULL, &enabled), -EINVAL, "read no device");
     RT_EXPECT_EQ(&t, runtime_code_mapper_get_enabled(map, NULL), -EINVAL, "nothing to read into");
+    RT_EXPECT_EQ(&t, runtime_code_mapper_set_enabled(scale, true), -ENODEV,
+                 "another driver's device");
+    RT_EXPECT_EQ(&t, runtime_code_mapper_get_enabled(scale, &enabled), -ENODEV,
+                 "read another driver's device");
 
     RT_EXPECT_EQ(&t, runtime_code_mapper_set_enabled(map, true), 0, "restore");
     RT_EXPECT_EQ(&t, runtime_code_mapper_set_enabled(map_off, false), 0, "restore start-disabled");
@@ -357,6 +369,10 @@ static void test_temp_layer_parameters(void) {
     RT_EXPECT_EQ(&t, runtime_temp_layer_set_params(layer, NULL), -EINVAL, "no parameters");
     RT_EXPECT_EQ(&t, runtime_temp_layer_get_params(NULL, &params), -EINVAL, "read no device");
     RT_EXPECT_EQ(&t, runtime_temp_layer_get_params(layer, NULL), -EINVAL, "nothing to read into");
+    RT_EXPECT_EQ(&t, runtime_temp_layer_set_params(map, &params), -ENODEV,
+                 "another driver's device");
+    RT_EXPECT_EQ(&t, runtime_temp_layer_get_params(map, &other), -ENODEV,
+                 "read another driver's device");
 
     rt_finish(&t);
 }

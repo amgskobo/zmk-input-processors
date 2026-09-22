@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
  * 37 characters: "multiplier" no longer fits the 48-byte key custom-settings
  * accepts. The key is checked before the stored name, and before the setting
  * is defined, so the build stops at the message that names the node.

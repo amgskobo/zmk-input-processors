@@ -187,9 +187,14 @@ static void deactivate_work_cb(struct k_work *work) {
     k_mutex_unlock(&data->lock);
 }
 
+static bool runtime_temp_layer_device_valid(const struct device *dev);
+
 int runtime_temp_layer_get_params(const struct device *dev, struct runtime_temp_layer_params *out) {
     if (dev == NULL || out == NULL) {
         return -EINVAL;
+    }
+    if (!runtime_temp_layer_device_valid(dev)) {
+        return -ENODEV;
     }
 
     struct runtime_temp_layer_data *data = dev->data;
@@ -209,6 +214,9 @@ int runtime_temp_layer_set_params(const struct device *dev,
                                   const struct runtime_temp_layer_params *params) {
     if (dev == NULL || params == NULL) {
         return -EINVAL;
+    }
+    if (!runtime_temp_layer_device_valid(dev)) {
+        return -ENODEV;
     }
 
     if (!runtime_temp_layer_values_valid(params->layer, params->timeout_ms,
@@ -502,3 +510,20 @@ static const struct zmk_input_processor_driver_api runtime_temp_layer_driver_api
                           CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &runtime_temp_layer_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TEMP_LAYER_INST)
+
+#define RUNTIME_TEMP_LAYER_DEVICE_REF(n) DEVICE_DT_INST_GET(n),
+
+/* The runtime API reads dev->data as this driver's data, so it accepts only the
+ * devices this driver defined. */
+static const struct device *const runtime_temp_layer_devices[] = {
+    DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TEMP_LAYER_DEVICE_REF)};
+
+static bool runtime_temp_layer_device_valid(const struct device *dev) {
+    for (size_t i = 0U; i < ARRAY_SIZE(runtime_temp_layer_devices); i++) {
+        if (runtime_temp_layer_devices[i] == dev) {
+            return true;
+        }
+    }
+
+    return false;
+}

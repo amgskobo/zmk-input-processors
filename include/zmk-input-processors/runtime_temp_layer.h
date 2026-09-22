@@ -62,13 +62,17 @@ struct runtime_temp_layer_params {
     uint16_t require_prior_idle_ms;
 };
 
-/* Reads the parameters the processor is applying right now. */
+/*
+ * Reads the parameters the processor is applying right now. Returns -ENODEV
+ * when dev is not a runtime temp-layer instance.
+ */
 int runtime_temp_layer_get_params(const struct device *dev, struct runtime_temp_layer_params *out);
 
 /*
  * Applies new parameters. Returns -EINVAL and changes nothing when the layer
  * is out of range, so a bad value from a client cannot leave the processor
- * raising a layer that does not exist.
+ * raising a layer that does not exist, and -ENODEV when dev is not a runtime
+ * temp-layer instance.
  *
  * A layer already raised stays raised on its old number until it drops
  * normally; a new layer number takes effect at the next activation. Moving a

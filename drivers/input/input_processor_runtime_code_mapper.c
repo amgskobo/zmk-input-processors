@@ -38,9 +38,14 @@ struct runtime_code_mapper_data {
     atomic_t enabled;
 };
 
+static bool runtime_code_mapper_device_valid(const struct device *dev);
+
 int runtime_code_mapper_get_enabled(const struct device *dev, bool *out) {
     if (dev == NULL || out == NULL) {
         return -EINVAL;
+    }
+    if (!runtime_code_mapper_device_valid(dev)) {
+        return -ENODEV;
     }
 
     struct runtime_code_mapper_data *data = dev->data;
@@ -53,6 +58,9 @@ int runtime_code_mapper_get_enabled(const struct device *dev, bool *out) {
 int runtime_code_mapper_set_enabled(const struct device *dev, bool enabled) {
     if (dev == NULL) {
         return -EINVAL;
+    }
+    if (!runtime_code_mapper_device_valid(dev)) {
+        return -ENODEV;
     }
 
     struct runtime_code_mapper_data *data = dev->data;
@@ -117,3 +125,20 @@ static const struct zmk_input_processor_driver_api runtime_code_mapper_driver_ap
                           CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &runtime_code_mapper_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(RUNTIME_CODE_MAPPER_INST)
+
+#define RUNTIME_CODE_MAPPER_DEVICE_REF(n) DEVICE_DT_INST_GET(n),
+
+/* The runtime API reads dev->data as this driver's data, so it accepts only the
+ * devices this driver defined. */
+static const struct device *const runtime_code_mapper_devices[] = {
+    DT_INST_FOREACH_STATUS_OKAY(RUNTIME_CODE_MAPPER_DEVICE_REF)};
+
+static bool runtime_code_mapper_device_valid(const struct device *dev) {
+    for (size_t i = 0U; i < ARRAY_SIZE(runtime_code_mapper_devices); i++) {
+        if (runtime_code_mapper_devices[i] == dev) {
+            return true;
+        }
+    }
+
+    return false;
+}

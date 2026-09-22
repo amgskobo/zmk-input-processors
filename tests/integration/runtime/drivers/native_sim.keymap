@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
  * One instance of each driver in each starting state, for the driver
  * self-tests. The keymap gives the temp layers somewhere to go: position 0
  * presses a key, position 1 presses a key and is excluded, position 3 is empty.

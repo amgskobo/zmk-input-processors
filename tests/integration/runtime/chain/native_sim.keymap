@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
  * The processors in a real input listener, as a keyboard uses them: a mock
  * pointer feeds temp layer -> scaler -> transform, and while the layer is up
  * an override maps Y to the wheel before the same chain runs.

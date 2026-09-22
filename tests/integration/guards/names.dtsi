@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
  * The settings-name budget. A stored name is "custom_settings/amgskobo__rip/"
  * and then "<node>.<field>" in 64 bytes, so a node and its processor's longest
  * field may use 32 characters between them. These nodes sit exactly there and

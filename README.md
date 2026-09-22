@@ -2,6 +2,8 @@
 
 [![Test](https://github.com/amgskobo/zmk-input-processors/actions/workflows/test.yml/badge.svg)](https://github.com/amgskobo/zmk-input-processors/actions/workflows/test.yml)
 
+[日本語](README_JA.md)
+
 Runtime-configurable versions of ZMK's standard input processors.
 
 ZMK ships four configurable input processors—scaler, transform, code-mapper,
@@ -236,8 +238,8 @@ own `zmk,input-processor-scaler`. It differs in two ways.
 **The arithmetic is done in 64 bits.** The stock scaler holds
 `event->value * multiplier` in an `int16_t`, so with a multiplier of 889 any
 delta of 37 or more wraps negative before it is divided, and the pointer jumps
-backwards exactly when it is moving fastest. Cormoran's Runtime Input Processor
-inherited the same expression. Here the numerator and quotient are `int64_t`
+backwards exactly when it is moving fastest. A runtime scaler that copies the
+expression inherits the same reversal. Here the numerator and quotient are `int64_t`
 and an out-of-range quotient saturates instead of wrapping, so a fast movement
 stays a fast movement.
 
@@ -603,7 +605,7 @@ directly — see `include/zmk-input-processors/runtime_scaler.h`.
 ├── zephyr/
 │   └── module.yml                    # Zephyr module registration
 └── .github/
-    └── copilot-instructions.md       # AI agent guidelines
+    └── CONTRIBUTING.md               # contributor guide
 ```
 
 ## Development
@@ -657,7 +659,7 @@ guard case breaks at most one node per source file.
 
 ### Adding a New Input Processor
 
-See the [contributor guide](.github/copilot-instructions.md) for the module's
+See the [contributor guide](.github/CONTRIBUTING.md) for the module's
 architecture, correctness rules, required tests, and local-checkout workflow.
 The scaler
 [driver](drivers/input/input_processor_runtime_scaler.c) and its adjacent
@@ -670,4 +672,4 @@ parameter and its optional Studio publication.
 
 ## Contributing
 
-Contributions are welcome! Please follow the coding patterns and conventions documented in [.github/copilot-instructions.md](.github/copilot-instructions.md).
+Contributions are welcome! Please follow the coding patterns and conventions documented in [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
