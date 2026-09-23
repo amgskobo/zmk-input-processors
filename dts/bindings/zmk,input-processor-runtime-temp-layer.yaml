@@ -46,6 +46,12 @@ properties:
       anything else the pointer hand reaches for while the layer is up. Every
       other press drops it immediately. With no list at all, no key press drops
       the layer and only the timeout does.
+  blocked-by-layers:
+    type: array
+    description: >-
+      Do not raise this layer while any listed layer is active. The check runs
+      when queued activation work executes, so two pointer sources reporting
+      before that work runs cannot both claim mutually exclusive roles.
   start-disabled:
     type: boolean
     description: >-

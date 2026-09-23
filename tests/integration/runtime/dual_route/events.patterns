@@ -1,0 +1,13 @@
+/PASS: first pointer owns the touch role/p
+/REPLAY: pointer-and-scroll begin/,/REPLAY: pointer-and-scroll end/{
+/REPLAY:/p
+/hid_mouse_scroll_set: Mouse scroll set to/p
+/hid_mouse_movement_set: Mouse movement set to/p
+}
+/PASS: both touch layers timed out/p
+/PASS: pointer role transferred/p
+/REPLAY: after-transfer begin/,/REPLAY: after-transfer end/{
+/REPLAY:/p
+/hid_mouse_scroll_set: Mouse scroll set to/p
+/hid_mouse_movement_set: Mouse movement set to/p
+}

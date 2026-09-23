@@ -31,6 +31,14 @@
         spare {
             bindings = <&trans &trans &trans &trans>;
         };
+
+        left_touch {
+            bindings = <&trans &trans &trans &trans>;
+        };
+
+        right_touch {
+            bindings = <&trans &trans &trans &trans>;
+        };
     };
 
     rt_scale: rt_scale {
@@ -84,6 +92,20 @@
         layer = <3>;
         timeout-ms = <100>;
         start-disabled;
+    };
+
+    rt_left_touch: rt_left_touch {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <4>;
+        timeout-ms = <100>;
+    };
+
+    rt_right_touch: rt_right_touch {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <5>;
+        timeout-ms = <100>;
     };
 };
 

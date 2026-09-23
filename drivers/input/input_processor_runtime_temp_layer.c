@@ -55,6 +55,8 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 struct runtime_temp_layer_config {
     const uint16_t *excluded_positions;
     size_t num_positions;
+    const uint16_t *blocked_by_layers;
+    size_t num_blocked_layers;
 };
 
 struct runtime_temp_layer_data {
@@ -131,6 +133,7 @@ static void set_layer_locked(struct runtime_temp_layer_data *data, bool activate
 static void activate_work_cb(struct k_work *work) {
     struct runtime_temp_layer_data *data =
         CONTAINER_OF(work, struct runtime_temp_layer_data, activate_work);
+    const struct runtime_temp_layer_config *config = data->dev->config;
 
     if (k_mutex_lock(&data->lock, K_FOREVER) < 0) {
         return;
@@ -141,7 +144,15 @@ static void activate_work_cb(struct k_work *work) {
 
     const atomic_val_t generation = data->pending_generation;
 
-    if (data->activation_pending && generation == atomic_get(&data->generation) &&
+    bool blocked = false;
+    for (size_t i = 0; i < config->num_blocked_layers; i++) {
+        if (zmk_keymap_layer_active(config->blocked_by_layers[i])) {
+            blocked = true;
+            break;
+        }
+    }
+
+    if (data->activation_pending && generation == atomic_get(&data->generation) && !blocked &&
         runtime_temp_layer_should_activate(data->params.enabled, data->is_active, typing)) {
         data->active_layer = data->pending_layer;
         set_layer_locked(data, true);
@@ -467,6 +478,15 @@ static int runtime_temp_layer_handle_event(const struct device *dev, struct inpu
 
 static int runtime_temp_layer_init(const struct device *dev) {
     struct runtime_temp_layer_data *data = dev->data;
+    const struct runtime_temp_layer_config *config = dev->config;
+
+    for (size_t i = 0; i < config->num_blocked_layers; i++) {
+        if (config->blocked_by_layers[i] >= ZMK_KEYMAP_LAYERS_LEN) {
+            LOG_ERR("%s: blocked layer %u is outside the keymap", dev->name,
+                    config->blocked_by_layers[i]);
+            return -EINVAL;
+        }
+    }
 
     data->dev = dev;
     atomic_set(&data->generation, 0);
@@ -492,9 +512,13 @@ static const struct zmk_input_processor_driver_api runtime_temp_layer_driver_api
                  "require-prior-idle-ms must be 0-60000");                                         \
     static const uint16_t runtime_temp_layer_positions_##n[] =                                     \
         DT_INST_PROP_OR(n, excluded_positions, {});                                                \
+    static const uint16_t runtime_temp_layer_blockers_##n[] =                                      \
+        DT_INST_PROP_OR(n, blocked_by_layers, {});                                                 \
     static const struct runtime_temp_layer_config runtime_temp_layer_config_##n = {                \
         .excluded_positions = runtime_temp_layer_positions_##n,                                    \
         .num_positions = DT_INST_PROP_LEN_OR(n, excluded_positions, 0),                            \
+        .blocked_by_layers = runtime_temp_layer_blockers_##n,                                      \
+        .num_blocked_layers = DT_INST_PROP_LEN_OR(n, blocked_by_layers, 0),                         \
     };                                                                                             \
     static struct runtime_temp_layer_data runtime_temp_layer_data_##n = {                          \
         .params =                                                                                  \

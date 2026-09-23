@@ -5,6 +5,10 @@ config ZMK_INPUT_PROCESSORS_TEST_DRIVERS
     bool "Run the runtime processor driver self-tests at boot"
     depends on ZMK_POINTING
 
+config ZMK_INPUT_PROCESSORS_TEST_DUAL_ROUTE
+    bool "Replay simultaneous pointer routes through two input listeners"
+    depends on ZMK_POINTING
+
 config ZMK_INPUT_PROCESSORS_TEST_SETTINGS
     bool "Run the runtime processor settings self-tests at boot"
     depends on ZMK_INPUT_PROCESSORS_CUSTOM_SETTINGS

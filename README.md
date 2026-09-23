@@ -397,7 +397,17 @@ pointer_layer: pointer_layer {
 | `timeout-ms` | int | *required* | Pointer silence before the layer drops, 0 to 60000 ms. 0 = never. |
 | `require-prior-idle-ms` | int | 0 | Window after a key press in which the layer will not come up, 0 to 60000 ms. |
 | `excluded-positions` | array | *none* | Positions that do not drop the layer. |
+| `blocked-by-layers` | array | *none* | Active layer IDs that prevent a queued activation from raising this layer. |
 | `start-disabled` | bool | false | Start switched off, raising nothing. |
+
+For two pointer sources that should have one pointer owner, give each instance
+the other one's layer in `blocked-by-layers`. The check runs on the activation
+work queue, after earlier queued activations have changed the keymap. Thus two
+events arriving before the queue runs leave the first layer active and the
+second unraised. The source using the unraised layer can take its listener's
+opposite-pointer scroll route. The property is structural; if a Studio edit
+changes either instance's target layer ID, update the blockers in devicetree
+as well. An out-of-range blocker prevents the processor device from starting.
 
 `layer` is published with the `LAYER_ID` constraint, so a client draws the
 keymap's own layer list and the row reads "MOUSE (3)" rather than "3" — a

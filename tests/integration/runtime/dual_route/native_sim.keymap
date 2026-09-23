@@ -1,0 +1,67 @@
+/* Two sources with mutually exclusive pointer and scroll routes. */
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/kscan_mock.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+        base { bindings = <&none &none &none &none>; };
+        right_touch { bindings = <&trans &trans &trans &trans>; };
+        left_touch { bindings = <&trans &trans &trans &trans>; };
+    };
+
+    left_pad: left_pad {
+        compatible = "zmk,input-mock";
+        event-period = <100>;
+        events = <>;
+    };
+    right_pad: right_pad {
+        compatible = "zmk,input-mock";
+        event-period = <100>;
+        events = <>;
+    };
+
+    left_presence: left_presence {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <2>;
+        blocked-by-layers = <1>;
+        timeout-ms = <400>;
+    };
+    right_presence: right_presence {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <1>;
+        blocked-by-layers = <2>;
+        timeout-ms = <400>;
+    };
+    scroll_map: scroll_map {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        map = <INPUT_REL_Y INPUT_REL_WHEEL>;
+    };
+
+    left_listener {
+        compatible = "zmk,input-listener";
+        device = <&left_pad>;
+        input-processors = <&left_presence>;
+        right_pointer_active {
+            layers = <1>;
+            input-processors = <&scroll_map>;
+        };
+    };
+    right_listener {
+        compatible = "zmk,input-listener";
+        device = <&right_pad>;
+        input-processors = <&right_presence>;
+        left_pointer_active {
+            layers = <2>;
+            input-processors = <&scroll_map>;
+        };
+    };
+};
+
+&kscan {
+    events = <ZMK_MOCK_PRESS(0,0,30000)>;
+};

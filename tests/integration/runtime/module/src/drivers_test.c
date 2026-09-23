@@ -39,10 +39,14 @@ static const struct device *const map_off = DEVICE_DT_GET(DT_NODELABEL(rt_map_of
 static const struct device *const layer = DEVICE_DT_GET(DT_NODELABEL(rt_layer));
 static const struct device *const layer_hold = DEVICE_DT_GET(DT_NODELABEL(rt_layer_hold));
 static const struct device *const layer_off = DEVICE_DT_GET(DT_NODELABEL(rt_layer_off));
+static const struct device *const left_touch = DEVICE_DT_GET(DT_NODELABEL(rt_left_touch));
+static const struct device *const right_touch = DEVICE_DT_GET(DT_NODELABEL(rt_right_touch));
 
 #define LAYER DT_PROP(DT_NODELABEL(rt_layer), layer)
 #define HOLD_LAYER DT_PROP(DT_NODELABEL(rt_layer_hold), layer)
 #define OFF_LAYER DT_PROP(DT_NODELABEL(rt_layer_off), layer)
+#define LEFT_TOUCH_LAYER DT_PROP(DT_NODELABEL(rt_left_touch), layer)
+#define RIGHT_TOUCH_LAYER DT_PROP(DT_NODELABEL(rt_right_touch), layer)
 #define TIMEOUT_MS DT_PROP(DT_NODELABEL(rt_layer), timeout_ms)
 #define IDLE_MS DT_PROP(DT_NODELABEL(rt_layer), require_prior_idle_ms)
 
@@ -666,6 +670,41 @@ static void test_temp_layer_start_disabled(void) {
     rt_finish(&t);
 }
 
+static void test_two_touch_activations_queued_together(void) {
+    struct runtime_test t = {
+        .name = "temp layer: two pointer sources can raise independent layers before routing updates"};
+
+    for (int order = 0; order < 2; order++) {
+        settle();
+        RT_EXPECT_EQ(&t,
+                     k_work_submit_to_queue(zmk_workqueue_lowprio_work_q(), &work_block) < 0,
+                     false, "queue the work blocker");
+        RT_EXPECT_EQ(&t, k_sem_take(&work_block_started, K_FOREVER), 0,
+                     "work queue is blocked");
+
+        /* Both callbacks observe the old keymap before either activation runs. */
+        queue_move(order == 0 ? left_touch : right_touch);
+        queue_move(order == 0 ? right_touch : left_touch);
+        RT_EXPECT_FALSE(&t, zmk_keymap_layer_active(LEFT_TOUCH_LAYER), "left still queued");
+        RT_EXPECT_FALSE(&t, zmk_keymap_layer_active(RIGHT_TOUCH_LAYER), "right still queued");
+
+        k_sem_give(&work_block_release);
+        k_sleep(K_MSEC(WORK_MS));
+        RT_EXPECT_TRUE(&t, zmk_keymap_layer_active(LEFT_TOUCH_LAYER), "left layer raised");
+        RT_EXPECT_TRUE(&t, zmk_keymap_layer_active(RIGHT_TOUCH_LAYER), "right layer raised");
+
+        /* Refreshing one input must not extend the other input's deadline. */
+        k_sleep(K_MSEC(TIMEOUT_MS / 2));
+        queue_move(left_touch);
+        k_sleep(K_MSEC(TIMEOUT_MS / 2 + WORK_MS));
+        RT_EXPECT_TRUE(&t, zmk_keymap_layer_active(LEFT_TOUCH_LAYER), "left refresh survived");
+        RT_EXPECT_FALSE(&t, zmk_keymap_layer_active(RIGHT_TOUCH_LAYER), "right timed out");
+        k_sleep(K_MSEC(TIMEOUT_MS / 2 + WORK_MS));
+        RT_EXPECT_FALSE(&t, zmk_keymap_layer_active(LEFT_TOUCH_LAYER), "left timed out");
+    }
+    rt_finish(&t);
+}
+
 static void run_tests(void *p1, void *p2, void *p3) {
     ARG_UNUSED(p1);
     ARG_UNUSED(p2);
@@ -691,6 +730,7 @@ static void run_tests(void *p1, void *p2, void *p3) {
     test_temp_layer_new_layer();
     test_temp_layer_hold();
     test_temp_layer_start_disabled();
+    test_two_touch_activations_queued_together();
 
     exit(0);
 }

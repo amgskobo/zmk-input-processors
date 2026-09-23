@@ -8,6 +8,10 @@ if(CONFIG_ZMK_INPUT_PROCESSORS_TEST_DRIVERS)
     target_sources(app PRIVATE src/drivers_test.c)
 endif()
 
+if(CONFIG_ZMK_INPUT_PROCESSORS_TEST_DUAL_ROUTE)
+    target_sources(app PRIVATE src/dual_route_test.c)
+endif()
+
 if(CONFIG_ZMK_INPUT_PROCESSORS_TEST_SETTINGS)
     target_sources(app PRIVATE src/settings_test.c src/subsystem_test.c)
 endif()

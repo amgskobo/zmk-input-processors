@@ -1,0 +1,38 @@
+PASS: first pointer owns the touch role (left first)
+REPLAY: pointer-and-scroll begin
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/4
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/0
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/0
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/7
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/0
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/0
+REPLAY: pointer-and-scroll end
+PASS: both touch layers timed out
+PASS: pointer role transferred (right now)
+REPLAY: after-transfer begin
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/4
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/0
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/0
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/7
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/0
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/0
+REPLAY: after-transfer end
+PASS: first pointer owns the touch role (right first)
+REPLAY: pointer-and-scroll begin
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/4
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/0
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/0
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/7
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/0
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/0
+REPLAY: pointer-and-scroll end
+PASS: both touch layers timed out
+PASS: pointer role transferred (left now)
+REPLAY: after-transfer begin
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/4
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/0
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/0
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/7
+zmk: zmk_hid_mouse_scroll_set: Mouse scroll set to 0/0
+zmk: zmk_hid_mouse_movement_set: Mouse movement set to 0/0
+REPLAY: after-transfer end

@@ -16,3 +16,4 @@ PASS: temp layer: a runtime timeout update replaces the pending deadline
 PASS: temp layer: a new layer number applies from the next activation
 PASS: temp layer: with no timeout and no exclusions the layer holds until switched off
 PASS: temp layer: starting disabled raises nothing
+PASS: temp layer: two pointer sources can raise independent layers before routing updates
