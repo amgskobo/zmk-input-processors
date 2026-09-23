@@ -389,7 +389,15 @@ pointer_layer: pointer_layer {
 | `timeout-ms` | int | *必須* | pointer の無操作がこの時間続くとレイヤーを下げます。0〜60000 ms。0 は timeout なし。 |
 | `require-prior-idle-ms` | int | 0 | キー押下後、この時間はレイヤーを上げません。0〜60000 ms。 |
 | `excluded-positions` | array | *なし* | レイヤーを下げない位置。 |
+| `blocked-by-layers` | array | *なし* | いずれかが有効なら、このレイヤーの予約済み有効化を抑止するレイヤー ID。 |
 | `start-disabled` | bool | false | 無効な状態で起動し、何も上げません。 |
+
+2 つの pointer に同時に別々のレイヤーを取らせたくない場合は、それぞれの
+`blocked-by-layers` に相手のレイヤー ID を指定します。判定は予約済みの有効化を
+実行する際に行うため、同じ処理待ちの間に両方から入力が届いても、先に有効化された
+レイヤーだけが残ります。有効化されなかった側は listener の別経路にできます。
+これは devicetree の構造的な値です。Studio で対象レイヤー ID を変更した場合は
+遮断側の指定も更新してください。範囲外の ID は初期化時に拒否されます。
 
 `layer` は `LAYER_ID` 制約付きで公開されるため、client は keymap 自身のレイヤー
 一覧を表示し、行は「3」ではなく「MOUSE (3)」のように表示されます。レイヤーは、
@@ -618,7 +626,7 @@ bash ./tests/run-integration-docker.sh
 | :--- | :--- |
 | `firmware` | すべての processor を 1 つずつ持つ shield が実機 board 向けにビルドでき、すべての設定キーが image に含まれること。1 つの devicetree を共有する split キーボードの両半分がビルドでき、central 側は設定付き、peripheral 側は設定と central 専用の temp layer なしでビルドされること。 |
 | `guards` | 文書化した各上限を超える devicetree がそれぞれ専用のメッセージでビルド時に拒否され、上限ちょうどの devicetree はビルドできること。 |
-| `runtime` | native_sim 上で snapshot と比較し、各 driver の API、event の絞り込み、ZMK 自身の keymap に対する temp-layer のタイミング、公開する各設定の型・既定値・範囲、公開先の Studio subsystem、driver への書き込みの反映、再起動後の保存値の再適用、起動時の重複キー報告、手計算した HID report を生成する listener chain、`input_processor_runtime.dtsi` の既定 node が上記の既定値で始まることを確認します。 |
+| `runtime` | native_sim 上で snapshot と比較し、各 driver の API、event の絞り込み、ZMK 自身の keymap に対する temp-layer のタイミングと 2 つの pointer 間のレイヤー競合、公開する各設定の型・既定値・範囲、公開先の Studio subsystem、driver への書き込みの反映、再起動後の保存値の再適用、起動時の重複キー報告、手計算した HID report を生成する listener chain、`input_processor_runtime.dtsi` の既定 node が上記の既定値で始まることを確認します。 |
 | `upstream` | custom settings を必要としない runtime ケースを、`zmk-feature-custom-settings` のない upstream ZMK でビルド・実行し、冒頭の説明どおり動作することを確認します。 |
 
 suite 名を指定すると一部だけ実行できます。Docker volume を使うと ZMK の workspace が
