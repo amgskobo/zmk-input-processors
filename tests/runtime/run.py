@@ -24,6 +24,15 @@ fixtures = (
         "runtime_scaler_init",
         "runtime_scaler_device_valid",
     )),
+    ("transform", "transform_harness.c", (
+        "encode_flags",
+        "decode_flags",
+        "runtime_transform_get_flags",
+        "runtime_transform_set_flags",
+        "runtime_transform_handle_event",
+        "runtime_transform_init",
+        "runtime_transform_device_valid",
+    )),
 )
 
 for module, harness_name, names in fixtures:

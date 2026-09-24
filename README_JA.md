@@ -618,9 +618,10 @@ bash ./tests/run-integration-docker.sh
 増えもしないという不変条件で検査します。transform、code map、temp-layer policy は
 入力の全範囲で検査します。
 CIは4つの純粋な算術・ポリシーヘッダーの行・分岐100%を要求します。
-同じコマンドでruntime code mapperの製品driverから5関数、runtime scalerから8関数を抽出し、
+同じコマンドでruntime code mapperの製品driverから5関数、runtime scalerから8関数、
+runtime transformから7関数を抽出し、
 最適化、ASan/UBSan、カバレッジの3構成で実行して、それぞれに行・分岐100%を要求します。
-他のZephyr側driverを含むmodule全体のカバレッジではありません。
+残りのZephyr側driverを含むmodule全体のカバレッジではありません。
 
 `run-integration-docker.sh` は、`zmk-feature-custom-settings` を含む DYA ZMK fork と、
 それを含まない upstream ZMK を取得し(キーボード設定や他の input processor module は
