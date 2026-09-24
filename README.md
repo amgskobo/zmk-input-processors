@@ -631,14 +631,17 @@ bash ./tests/run-integration-docker.sh
 ```
 
 `run-docker.sh` runs the contract tests in `tests/unit/`, one program for each
-header of dependency-free logic the drivers call. Each is built three ways --
-optimised, under AddressSanitizer and UndefinedBehaviorSanitizer, and as a
-32-bit program like the firmware it models -- and the headers also have to
+header of dependency-free logic the drivers call. Each is built four ways --
+optimised, under AddressSanitizer and UndefinedBehaviorSanitizer, with
+coverage instrumentation, and as a 32-bit program like the firmware it models
+-- and the headers also have to
 compile on their own, free of Zephyr, under `-Wconversion`. The scaler is
 checked against values pinned from the hardware session that found the
 reversal, a reference model, a million random cases, and the invariant that no
 movement is lost or invented. The transform, the code map and the temp-layer
 policy are checked across their whole input domains.
+CI requires 100% line and branch coverage of the four pure math/policy
+headers. Zephyr-facing driver coverage is separate and is not claimed here.
 
 `run-integration-docker.sh` fetches the DYA ZMK fork with
 `zmk-feature-custom-settings`, and upstream ZMK without it -- and no keyboard
