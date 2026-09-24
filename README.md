@@ -642,9 +642,9 @@ movement is lost or invented. The transform, the code map and the temp-layer
 policy are checked across their whole input domains.
 CI requires 100% line and branch coverage of the four pure math/policy
 headers. The same command also exercises five actual runtime code mapper
-driver functions in optimized, ASan/UBSan, and coverage variants, requiring
-100% line and branch coverage for those functions separately. Coverage of
-the other Zephyr-facing drivers is not claimed here.
+functions and eight runtime scaler functions in optimized, ASan/UBSan, and
+coverage variants, requiring 100% line and branch coverage for each driver
+scope separately. Coverage of the other Zephyr-facing drivers is not claimed here.
 
 `run-integration-docker.sh` fetches the DYA ZMK fork with
 `zmk-feature-custom-settings`, and upstream ZMK without it -- and no keyboard

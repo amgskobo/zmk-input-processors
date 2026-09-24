@@ -1,4 +1,4 @@
-"""Exercise the production runtime code mapper with host device stubs."""
+"""Exercise production runtime processors with host device stubs."""
 
 import pathlib
 import re
@@ -6,54 +6,68 @@ import subprocess
 import tempfile
 
 root = pathlib.Path(__file__).resolve().parents[2]
-source_path = root / "drivers/input/input_processor_runtime_code_mapper.c"
-source = source_path.read_text(encoding="utf-8")
-names = (
-    "runtime_code_mapper_get_enabled",
-    "runtime_code_mapper_set_enabled",
-    "runtime_code_mapper_handle_event",
-    "runtime_code_mapper_init",
-    "runtime_code_mapper_device_valid",
+fixtures = (
+    ("code_mapper", "harness.c", (
+        "runtime_code_mapper_get_enabled",
+        "runtime_code_mapper_set_enabled",
+        "runtime_code_mapper_handle_event",
+        "runtime_code_mapper_init",
+        "runtime_code_mapper_device_valid",
+    )),
+    ("scaler", "scaler_harness.c", (
+        "encode_ratio",
+        "decode_ratio",
+        "runtime_scaler_get_params",
+        "runtime_scaler_set_params",
+        "scale_value",
+        "runtime_scaler_handle_event",
+        "runtime_scaler_init",
+        "runtime_scaler_device_valid",
+    )),
 )
-functions = []
-for name in names:
-    found = None
-    for match in re.finditer(r"\b" + name + r"\s*\(", source):
-        closing = source.find(")", match.end())
-        if not source[closing + 1:].lstrip().startswith("{"):
-            continue
-        start = max(source.rfind("\nstatic", 0, match.start()),
-                    source.rfind("\nint ", 0, match.start())) + 1
-        preceding = source[start:match.start()]
-        if start and ";" not in preceding and "}" not in preceding:
-            found = start
-            break
-    if found is None:
-        raise RuntimeError(f"missing mapper definition: {name}")
-    end = source.index("\n}", match.end()) + 2
-    line = source.count("\n", 0, found) + 1
-    functions.append(f'#line {line} "{source_path}"\n' + source[found:end])
 
-harness = (root / "tests/runtime/harness.c").read_text(encoding="utf-8")
-with tempfile.TemporaryDirectory(prefix="mapper-runtime-") as folder:
-    work = pathlib.Path(folder)
-    unit = work / "test.c"
-    unit.write_text(harness.replace("/* DRIVER_FUNCTIONS */", "\n".join(functions) +
-                                    f'\n#line 1 "{unit}"\n'), encoding="utf-8")
-    for variant, flags in (
-        ("optimized", ["-O2"]),
-        ("sanitized", ["-O1", "-g", "-fno-omit-frame-pointer",
-                       "-fsanitize=address,undefined", "-fno-sanitize-recover=all"]),
-        ("coverage", ["-O0", "--coverage"]),
-    ):
-        binary = work / variant
-        subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", *flags,
-                        "-I" + str(root / "include"), str(unit), "-o", str(binary)],
-                       check=True)
-        subprocess.run([str(binary)], check=True)
-    report = subprocess.run(["gcov", "-b", "-c", "-o", str(work / "coverage-test.gcno"),
-                             str(unit)], cwd=work, check=True, capture_output=True, text=True)
-    print(report.stdout, end="")
-    driver = report.stdout.split(f"File '{source_path}'", 1)[1].split("Creating ", 1)[0]
-    if "Lines executed:100.00%" not in driver or "Taken at least once:100.00%" not in driver:
-        raise RuntimeError("runtime code mapper fell below 100% coverage")
+for module, harness_name, names in fixtures:
+    source_path = root / f"drivers/input/input_processor_runtime_{module}.c"
+    source = source_path.read_text(encoding="utf-8")
+    functions = []
+    for name in names:
+        found = None
+        for match in re.finditer(r"\b" + name + r"\s*\(", source):
+            closing = source.find(")", match.end())
+            if not source[closing + 1:].lstrip().startswith("{"):
+                continue
+            start = max(source.rfind("\nstatic", 0, match.start()),
+                        source.rfind("\nint ", 0, match.start())) + 1
+            preceding = source[start:match.start()]
+            if start and ";" not in preceding and "}" not in preceding:
+                found = start
+                break
+        if found is None:
+            raise RuntimeError(f"missing {module} definition: {name}")
+        end = source.index("\n}", match.end()) + 2
+        line = source.count("\n", 0, found) + 1
+        functions.append(f'#line {line} "{source_path}"\n' + source[found:end])
+
+    harness = (root / "tests/runtime" / harness_name).read_text(encoding="utf-8")
+    with tempfile.TemporaryDirectory(prefix=f"{module}-runtime-") as folder:
+        work = pathlib.Path(folder)
+        unit = work / "test.c"
+        unit.write_text(harness.replace("/* DRIVER_FUNCTIONS */", "\n".join(functions) +
+                                        f'\n#line 1 "{unit}"\n'), encoding="utf-8")
+        for variant, flags in (
+            ("optimized", ["-O2"]),
+            ("sanitized", ["-O1", "-g", "-fno-omit-frame-pointer",
+                           "-fsanitize=address,undefined", "-fno-sanitize-recover=all"]),
+            ("coverage", ["-O0", "--coverage"]),
+        ):
+            binary = work / variant
+            subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", *flags,
+                            "-I" + str(root / "include"), str(unit), "-o", str(binary)],
+                           check=True)
+            subprocess.run([str(binary)], check=True)
+        report = subprocess.run(["gcov", "-b", "-c", "-o", str(work / "coverage-test.gcno"),
+                                 str(unit)], cwd=work, check=True, capture_output=True, text=True)
+        print(report.stdout, end="")
+        driver = report.stdout.split(f"File '{source_path}'", 1)[1].split("Creating ", 1)[0]
+        if "Lines executed:100.00%" not in driver or "Taken at least once:100.00%" not in driver:
+            raise RuntimeError(f"runtime {module} fell below 100% coverage")
