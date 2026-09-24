@@ -82,3 +82,5 @@ for core in runtime_code_mapper_math runtime_scaler_math runtime_temp_layer_poli
     printf '%s\n' "$core_report" | grep -Fq 'Lines executed:100.00%'
     printf '%s\n' "$core_report" | grep -Fq 'Taken at least once:100.00%'
 done
+
+python3 "$repo_root/tests/runtime/run.py"
