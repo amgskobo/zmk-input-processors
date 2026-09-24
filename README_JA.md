@@ -612,11 +612,13 @@ bash ./tests/run-integration-docker.sh
 `run-docker.sh` は `tests/unit/` の契約テストを実行します。driver が呼び出す、
 依存のないロジックのヘッダーごとに 1 つのプログラムがあります。それぞれを
 最適化ビルド、AddressSanitizer と UndefinedBehaviorSanitizer 付きのビルド、
-ファームウェアと同じ 32-bit プログラムの 3 通りでビルドし、ヘッダーは Zephyr なしで
+カバレッジ計測、ファームウェアと同じ 32-bit プログラムの 4 通りでビルドし、ヘッダーは Zephyr なしで
 `-Wconversion` 付きの単独コンパイルも通す必要があります。scaler は、反転を発見した
 実機セッションで記録した値、参照モデル、100 万件のランダムケース、移動量が失われも
 増えもしないという不変条件で検査します。transform、code map、temp-layer policy は
 入力の全範囲で検査します。
+CIは4つの純粋な算術・ポリシーヘッダーの行・分岐100%を要求します。
+Zephyr側driver全体のカバレッジではありません。
 
 `run-integration-docker.sh` は、`zmk-feature-custom-settings` を含む DYA ZMK fork と、
 それを含まない upstream ZMK を取得し(キーボード設定や他の input processor module は
