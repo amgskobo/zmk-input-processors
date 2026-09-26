@@ -27,6 +27,8 @@
 #include <zmk-input-processors/custom_settings.h>
 #include <zmk-input-processors/runtime_transform.h>
 
+#include "input_processors_custom_settings.h"
+
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #define RUNTIME_TRANSFORM_SETTING(n, field, key)                                                   \
@@ -45,19 +47,6 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TRANSFORM_SETTINGS)
 
-static bool read_flag(const struct zmk_custom_setting *setting, bool *out) {
-    struct zmk_custom_setting_value value;
-
-    if (zmk_custom_setting_read(setting, &value) != 0 ||
-        value.type != ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL) {
-        return false;
-    }
-
-    *out = value.bool_value;
-
-    return true;
-}
-
 /*
  * Applied as a set. A client moving one at a time would otherwise put the
  * pointer through an orientation nobody chose, and a swap combined with a
@@ -67,9 +56,9 @@ static bool read_flag(const struct zmk_custom_setting *setting, bool *out) {
     {                                                                                              \
         struct runtime_transform_flags flags;                                                      \
                                                                                                    \
-        if (read_flag(&runtime_transform_cs_xy_swap_##n, &flags.xy_swap) &&                        \
-            read_flag(&runtime_transform_cs_x_invert_##n, &flags.x_invert) &&                      \
-            read_flag(&runtime_transform_cs_y_invert_##n, &flags.y_invert)) {                      \
+        if (input_processors_read_bool(&runtime_transform_cs_xy_swap_##n, &flags.xy_swap) &&       \
+            input_processors_read_bool(&runtime_transform_cs_x_invert_##n, &flags.x_invert) &&     \
+            input_processors_read_bool(&runtime_transform_cs_y_invert_##n, &flags.y_invert)) {     \
             (void)runtime_transform_set_flags(DEVICE_DT_INST_GET(n), &flags);                      \
         }                                                                                          \
     }

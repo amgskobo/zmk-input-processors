@@ -29,6 +29,8 @@
 #include <zmk-input-processors/runtime_temp_layer.h>
 #include <zmk-input-processors/runtime_temp_layer_policy.h>
 
+#include "input_processors_custom_settings.h"
+
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #define RUNTIME_TEMP_LAYER_SETTING(n, field, key, ...)                                             \
@@ -83,32 +85,6 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TEMP_LAYER_SETTINGS)
 
-static bool read_bool(const struct zmk_custom_setting *setting, bool *out) {
-    struct zmk_custom_setting_value value;
-
-    if (zmk_custom_setting_read(setting, &value) != 0 ||
-        value.type != ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL) {
-        return false;
-    }
-
-    *out = value.bool_value;
-
-    return true;
-}
-
-static bool read_int32(const struct zmk_custom_setting *setting, uint32_t *out) {
-    struct zmk_custom_setting_value value;
-
-    if (zmk_custom_setting_read(setting, &value) != 0 ||
-        value.type != ZMK_CUSTOM_SETTING_VALUE_TYPE_INT32 || value.int32_value < 0) {
-        return false;
-    }
-
-    *out = (uint32_t)value.int32_value;
-
-    return true;
-}
-
 /*
  * Applied as a set, so the layer and the timers never come from different
  * generations of the same edit.
@@ -119,10 +95,12 @@ static bool read_int32(const struct zmk_custom_setting *setting, uint32_t *out) 
         uint32_t layer;                                                                            \
         uint32_t prior_idle;                                                                       \
                                                                                                    \
-        if (read_bool(&runtime_temp_layer_cs_enabled_##n, &params.enabled) &&                      \
-            read_int32(&runtime_temp_layer_cs_layer_##n, &layer) &&                                \
-            read_int32(&runtime_temp_layer_cs_timeout_ms_##n, &params.timeout_ms) &&               \
-            read_int32(&runtime_temp_layer_cs_require_prior_idle_ms_##n, &prior_idle) &&           \
+        if (input_processors_read_bool(&runtime_temp_layer_cs_enabled_##n, &params.enabled) &&     \
+            input_processors_read_uint32(&runtime_temp_layer_cs_layer_##n, &layer) &&              \
+            input_processors_read_uint32(&runtime_temp_layer_cs_timeout_ms_##n,                    \
+                                         &params.timeout_ms) &&                                    \
+            input_processors_read_uint32(&runtime_temp_layer_cs_require_prior_idle_ms_##n,         \
+                                         &prior_idle) &&                                           \
             runtime_temp_layer_values_valid(layer, params.timeout_ms, prior_idle,                  \
                                             ZMK_KEYMAP_LAYERS_LEN)) {                              \
             params.layer = (uint8_t)layer;                                                         \

@@ -46,11 +46,13 @@ for header in "${host_headers[@]}"; do
     cc "${warnings[@]}" -Wconversion -Wsign-conversion -fsyntax-only -I"$repo_root/include" \
         "$build_dir/header.c"
 done
+
 echo "headers: ${#host_headers[@]} compile on their own"
 
 variants=(
     "optimised:-O2"
     "sanitized:-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all"
+    "coverage:-O0 --coverage"
     "32-bit:-O2 -m32"
 )
 
@@ -72,3 +74,13 @@ for source in "$repo_root"/tests/unit/test_*.c; do
         "$build_dir/$name-$label"
     done
 done
+
+coverage_report="$(cd "$build_dir" && gcov -b -c *coverage*.gcno)"
+printf '%s\n' "$coverage_report"
+for core in runtime_code_mapper_math runtime_scaler_math runtime_temp_layer_policy runtime_transform_math; do
+    core_report="$(printf '%s\n' "$coverage_report" | grep -F -A4 "File '$repo_root/include/zmk-input-processors/$core.h'")"
+    printf '%s\n' "$core_report" | grep -Fq 'Lines executed:100.00%'
+    printf '%s\n' "$core_report" | grep -Fq 'Taken at least once:100.00%'
+done
+
+python3 "$repo_root/tests/runtime/run.py"

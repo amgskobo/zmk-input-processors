@@ -631,14 +631,27 @@ bash ./tests/run-integration-docker.sh
 ```
 
 `run-docker.sh` runs the contract tests in `tests/unit/`, one program for each
-header of dependency-free logic the drivers call. Each is built three ways --
-optimised, under AddressSanitizer and UndefinedBehaviorSanitizer, and as a
-32-bit program like the firmware it models -- and the headers also have to
+header of dependency-free logic the drivers call. Each is built four ways --
+optimised, under AddressSanitizer and UndefinedBehaviorSanitizer, with
+coverage instrumentation, and as a 32-bit program like the firmware it models
+-- and the headers also have to
 compile on their own, free of Zephyr, under `-Wconversion`. The scaler is
 checked against values pinned from the hardware session that found the
 reversal, a reference model, a million random cases, and the invariant that no
 movement is lost or invented. The transform, the code map and the temp-layer
 policy are checked across their whole input domains.
+CI requires 100% line and branch coverage of the four pure math/policy
+headers. The same command then lifts production functions out of the drivers
+into the stubbed harnesses in `tests/runtime/` -- five from the code mapper,
+eight from the scaler, seven from the transform, thirteen from the temp layer
+(its work items, settings writes and key, position and layer events), and the
+shared setting readers and duplicate-key check -- runs each optimized, under
+ASan/UBSan and with coverage, and requires 100% line and branch coverage of
+each source file separately. Each processor's settings bridge and the temp
+layer's listener are lifted with their macros too, and the runner fails if
+any function in the sources has no gate. Devicetree instantiation and the
+listener registrations themselves are covered by the integration suites
+below rather than by a percentage.
 
 `run-integration-docker.sh` fetches the DYA ZMK fork with
 `zmk-feature-custom-settings`, and upstream ZMK without it -- and no keyboard

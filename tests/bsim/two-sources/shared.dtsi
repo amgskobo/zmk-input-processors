@@ -1,0 +1,58 @@
+/*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
+ * What both halves share: the right pad reaches the central through a ZMK
+ * input split, and the processors both pads' listeners use. Position 1 (B)
+ * is the pointer hand's click and does not drop a presence layer.
+ */
+
+#include <zmk-input-processors/input_processor_runtime.dtsi>
+
+#define RIGHT 1
+#define LEFT 2
+#define MOVE(delay, x, y) delay INPUT_EV_REL INPUT_REL_X (x) 0 0 INPUT_EV_REL INPUT_REL_Y (y) 1
+
+/ {
+    splits {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        split_input: split_input@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
+    };
+
+    right_touch: right_touch {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <RIGHT>;
+        blocked-by-layers = <LEFT>;
+        timeout-ms = <400>;
+        require-prior-idle-ms = <300>;
+        excluded-positions = <1>;
+    };
+
+    left_touch: left_touch {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <LEFT>;
+        blocked-by-layers = <RIGHT>;
+        timeout-ms = <400>;
+        require-prior-idle-ms = <300>;
+        excluded-positions = <1>;
+    };
+
+    split_listener: split_listener {
+        compatible = "zmk,input-listener";
+        status = "disabled";
+        device = <&split_input>;
+        input-processors = <&right_touch>;
+
+        left_active {
+            layers = <LEFT>;
+            input-processors = <&zip_runtime_scroll_mapper>;
+        };
+    };
+};
