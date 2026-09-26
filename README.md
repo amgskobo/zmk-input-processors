@@ -641,11 +641,17 @@ reversal, a reference model, a million random cases, and the invariant that no
 movement is lost or invented. The transform, the code map and the temp-layer
 policy are checked across their whole input domains.
 CI requires 100% line and branch coverage of the four pure math/policy
-headers. The same command also exercises five actual runtime code mapper
-functions, eight runtime scaler functions, and seven runtime transform
-functions in optimized, ASan/UBSan, and coverage variants, requiring 100%
-line and branch coverage for each driver scope separately. Coverage of the
-remaining Zephyr-facing drivers is not claimed here.
+headers. The same command then lifts production functions out of the drivers
+into the stubbed harnesses in `tests/runtime/` -- five from the code mapper,
+eight from the scaler, seven from the transform, thirteen from the temp layer
+(its work items, settings writes and key, position and layer events), and the
+shared setting readers and duplicate-key check -- runs each optimized, under
+ASan/UBSan and with coverage, and requires 100% line and branch coverage of
+each source file separately. Each processor's settings bridge and the temp
+layer's listener are lifted with their macros too, and the runner fails if
+any function in the sources has no gate. Devicetree instantiation and the
+listener registrations themselves are covered by the integration suites
+below rather than by a percentage.
 
 `run-integration-docker.sh` fetches the DYA ZMK fork with
 `zmk-feature-custom-settings`, and upstream ZMK without it -- and no keyboard

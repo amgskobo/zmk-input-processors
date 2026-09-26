@@ -25,6 +25,8 @@
 #include <zmk-input-processors/custom_settings.h>
 #include <zmk-input-processors/runtime_code_mapper.h>
 
+#include "input_processors_custom_settings.h"
+
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 /*
@@ -45,11 +47,10 @@ DT_INST_FOREACH_STATUS_OKAY(RUNTIME_CODE_MAPPER_SETTINGS)
 
 #define RUNTIME_CODE_MAPPER_APPLY(n)                                                               \
     {                                                                                              \
-        struct zmk_custom_setting_value value;                                                     \
+        bool enabled;                                                                              \
                                                                                                    \
-        if (zmk_custom_setting_read(&runtime_code_mapper_cs_enabled_##n, &value) == 0 &&           \
-            value.type == ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL) {                                    \
-            (void)runtime_code_mapper_set_enabled(DEVICE_DT_INST_GET(n), value.bool_value);        \
+        if (input_processors_read_bool(&runtime_code_mapper_cs_enabled_##n, &enabled)) {           \
+            (void)runtime_code_mapper_set_enabled(DEVICE_DT_INST_GET(n), enabled);                 \
         }                                                                                          \
     }
 

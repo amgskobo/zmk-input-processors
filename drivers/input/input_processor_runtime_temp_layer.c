@@ -340,8 +340,8 @@ static int handle_position_state_changed(const struct device *dev,
 
     const bool excluded = position_is_excluded(config, ev->position);
 
-    if (runtime_temp_layer_should_drop_for_position(data->is_active, ev->state,
-                                                    config->num_positions > 0, excluded)) {
+    /* Only instances with an exclusion list get this far: see the return above. */
+    if (runtime_temp_layer_should_drop_for_position(data->is_active, ev->state, true, excluded)) {
         set_layer_locked(data, false);
         data->deactivate_at = 0;
         data->force_deactivate = false;

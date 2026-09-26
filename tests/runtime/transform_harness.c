@@ -22,7 +22,9 @@ struct device { const void *config; void *data; const char *name; };
 struct input_event { uint8_t type; uint16_t code; int32_t value; };
 struct zmk_input_processor_state { int unused; };
 static struct device valid_device;
-static const struct device *const runtime_transform_devices[] = {&valid_device};
+/* Another instance first, so a lookup has to walk the list. */
+static struct device first_device;
+static const struct device *const runtime_transform_devices[] = {&first_device, &valid_device};
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define BIT(n) (1 << (n))
 #define ZMK_INPUT_PROC_CONTINUE 0
@@ -100,6 +102,8 @@ int main(void) {
     event = (struct input_event){.type = 4, .code = 2, .value = 6};
     assert(runtime_transform_handle_event(&valid_device, &event, 0, 0, NULL) == 0);
     assert(applies == 2 && event.code == 2 && event.value == -6 && last_flags.y_invert);
+    /* Every device in the list counts, the first as much as the last. */
+    assert(runtime_transform_device_valid(&first_device));
     puts("runtime transform driver: PASS");
     return 0;
 }

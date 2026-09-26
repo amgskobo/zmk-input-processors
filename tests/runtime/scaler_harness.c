@@ -22,7 +22,9 @@ struct device { const void *config; void *data; const char *name; };
 struct input_event { uint8_t type; uint16_t code; int32_t value; };
 struct zmk_input_processor_state { int16_t *remainder; };
 static struct device valid_device;
-static const struct device *const runtime_scaler_devices[] = {&valid_device};
+/* Another instance first, so a lookup has to walk the list. */
+static struct device first_device;
+static const struct device *const runtime_scaler_devices[] = {&first_device, &valid_device};
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define ZMK_INPUT_PROC_CONTINUE 0
 #define ARG_UNUSED(x) ((void)(x))
@@ -81,6 +83,8 @@ int main(void) {
     event.value = 7;
     assert(runtime_scaler_handle_event(&valid_device, &event, 0, 0, &state) == 0);
     assert(event.value == 0);
+    /* Every device in the list counts, the first as much as the last. */
+    assert(runtime_scaler_device_valid(&first_device));
     puts("runtime scaler driver: PASS");
     return 0;
 }

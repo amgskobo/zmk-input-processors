@@ -26,6 +26,8 @@
 #include <zmk-input-processors/custom_settings.h>
 #include <zmk-input-processors/runtime_scaler.h>
 
+#include "input_processors_custom_settings.h"
+
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #define RUNTIME_SCALER_SETTING(n, field, key, lo)                                                  \
@@ -44,19 +46,6 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 DT_INST_FOREACH_STATUS_OKAY(RUNTIME_SCALER_SETTINGS)
 
-static bool read_param(const struct zmk_custom_setting *setting, uint32_t *out) {
-    struct zmk_custom_setting_value value;
-
-    if (zmk_custom_setting_read(setting, &value) != 0 ||
-        value.type != ZMK_CUSTOM_SETTING_VALUE_TYPE_INT32 || value.int32_value < 0) {
-        return false;
-    }
-
-    *out = (uint32_t)value.int32_value;
-
-    return true;
-}
-
 /*
  * Applied as a pair. A client that moves one number at a time would otherwise
  * make the pointer briefly run at a ratio nobody chose, which on a large
@@ -67,8 +56,8 @@ static bool read_param(const struct zmk_custom_setting *setting, uint32_t *out) 
         uint32_t multiplier;                                                                       \
         uint32_t divisor;                                                                          \
                                                                                                    \
-        if (read_param(&runtime_scaler_cs_multiplier_##n, &multiplier) &&                          \
-            read_param(&runtime_scaler_cs_divisor_##n, &divisor)) {                                \
+        if (input_processors_read_uint32(&runtime_scaler_cs_multiplier_##n, &multiplier) &&        \
+            input_processors_read_uint32(&runtime_scaler_cs_divisor_##n, &divisor)) {              \
             (void)runtime_scaler_set_params(DEVICE_DT_INST_GET(n), multiplier, divisor);           \
         }                                                                                          \
     }
