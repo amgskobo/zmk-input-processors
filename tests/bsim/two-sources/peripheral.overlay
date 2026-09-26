@@ -1,0 +1,41 @@
+/*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
+ * The peripheral's pad, scripted as (delay-ms type code value sync), which
+ * reaches the central through the input split. nrf52_bsim.keymap has the
+ * timeline.
+ */
+#include <dt-bindings/zmk/kscan_mock.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include "shared.dtsi"
+&kscan {
+    /delete-property/ exit-after;
+    /* A mock event's delay is also the wait after it: C goes down at 7.6 s. */
+    events = <ZMK_MOCK_RELEASE(1,1,3800) ZMK_MOCK_PRESS(1,0,50) ZMK_MOCK_RELEASE(1,0,50)>;
+};
+/ {
+    right_pad: right_pad {
+        compatible = "zmk,test-input-script";
+        events = <
+            /* 4.00 s to 4.79 s: moves with the left pad, then on alone. */
+            MOVE(4000, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0)
+            MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0)
+            MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0)
+            MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0)
+            MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0)
+            MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0)
+            MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0)
+            MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0) MOVE(20, 10, 0)
+            /* 5.60 s: 50 ms after a key press on the central. */
+            MOVE(820, 10, 0) MOVE(10, 10, 0) MOVE(10, 10, 0) MOVE(10, 10, 0) MOVE(10, 10, 0)
+            /* 6.50 s: raises its layer; keys at 6.60 s and 6.70 s. */
+            MOVE(860, 10, 0) MOVE(10, 10, 0) MOVE(10, 10, 0) MOVE(10, 10, 0) MOVE(10, 10, 0)
+            /* 7.50 s: raises its layer; C on this half at 7.60 s. */
+            MOVE(960, 10, 0) MOVE(10, 10, 0) MOVE(10, 10, 0) MOVE(10, 10, 0) MOVE(10, 10, 0)
+        >;
+    };
+};
+&split_input {
+    device = <&right_pad>;
+};

@@ -1,0 +1,76 @@
+/*
+ * Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT
+ *
+ * Two pads, each a pointer that raises its own presence layer and a scroller
+ * while the other one's layer is up: the left pad on the central, the right
+ * pad on the peripheral, behind the split link. Each presence layer is
+ * blocked by the other one, so when both pads move at once exactly one of
+ * them becomes the pointer.
+ *
+ * 4.00 s  Both pads move. The left pad's reports reach the central first, so
+ *         LEFT goes up and the right pad scrolls; RIGHT stays down.
+ * 4.10 s  The left pad stops. LEFT drops 400 ms later, at about 4.5 s, and
+ *         the right pad, still moving, becomes a pointer and raises RIGHT.
+ *         RIGHT drops 400 ms after it stops at 4.79 s.
+ * 5.50 s  A on the central. The right pad moves at 5.60 s, inside the 300 ms
+ *         typing guard: it points, but raises nothing.
+ * 6.50 s  The right pad raises RIGHT. B, an excluded key, at 6.60 s keeps
+ *         it; A at 6.70 s drops it at once.
+ * 7.50 s  The right pad raises RIGHT. C on the peripheral at 7.60 s drops it.
+ */
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/kscan_mock.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include "shared.dtsi"
+&kscan {
+    /delete-property/ exit-after;
+    /* A mock event's delay is also the wait after it, so a no-op release
+     * leads: A goes down at 5.5 s, B at 6.6 s and A again at 6.7 s. */
+    events = <ZMK_MOCK_RELEASE(1,1,2750) ZMK_MOCK_PRESS(0,0,50) ZMK_MOCK_RELEASE(0,0,1050)
+              ZMK_MOCK_PRESS(0,1,50) ZMK_MOCK_RELEASE(0,1,50)
+              ZMK_MOCK_PRESS(0,0,50) ZMK_MOCK_RELEASE(0,0,50)>;
+};
+/ {
+    left_pad: left_pad {
+        compatible = "zmk,test-input-script";
+        events = <
+            /* 4.00 s to 4.09 s. */
+            MOVE(4000, 0, 10) MOVE(10, 0, 10) MOVE(10, 0, 10) MOVE(10, 0, 10) MOVE(10, 0, 10)
+            MOVE(10, 0, 10) MOVE(10, 0, 10) MOVE(10, 0, 10) MOVE(10, 0, 10) MOVE(10, 0, 10)
+        >;
+    };
+    left_listener: left_listener {
+        compatible = "zmk,input-listener";
+        device = <&left_pad>;
+        input-processors = <&left_touch>;
+        right_active {
+            layers = <RIGHT>;
+            input-processors = <&zip_runtime_scroll_mapper>;
+        };
+    };
+};
+&split_listener {
+    status = "okay";
+};
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+        default_layer {
+            bindings = <
+            &kp A &kp B
+            &kp C &kp D>;
+        };
+        right_touch {
+            bindings = <
+            &trans &trans
+            &trans &trans>;
+        };
+        left_touch {
+            bindings = <
+            &trans &trans
+            &trans &trans>;
+        };
+    };
+};

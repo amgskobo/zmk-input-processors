@@ -1,0 +1,6 @@
+/Mouse (movement|scroll) set to 0\/0$/d
+s/^d_00: @[0-9:.]{15}  \[([0-9:.,]+)\] <[a-z]+> zmk: zmk_hid_mouse_(movement|scroll)_set: (.*)/[\1] \3/p
+s/^d_00: @[0-9:.]{15}  \[([0-9:.,]+)\] <[a-z]+> zmk: layer_changed: (.*)/[\1] \2/p
+s/^d_00: @[0-9:.]{15}  \[([0-9:.,]+)\] <[a-z]+> zmk: set_layer_locked: (.*)/[\1] \2/p
+s/^d_00: @[0-9:.]{15}  \[([0-9:.,]+)\] <[a-z]+> zmk: keycode_state_changed_listener: (.*)/[\1] \2/p
+s/^d_00: @[0-9:.]{15}  \[([0-9:.,]+)\] <[a-z]+> zmk: on_keymap_binding_(pressed|released): (position [0-9]+).*/[\1] \2 \3/p
