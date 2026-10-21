@@ -4,6 +4,12 @@
 
 [English](README.md)
 
+仮レイヤーの変更は、全インスタンス共通のロックを取ってから各インスタンスの
+ロックを取ります。ワーカーからの有効化と、別インスタンスのキー位置による解除が
+同時に起きても、同期的なレイヤー通知を通じて互いを待ち続ける状態を防ぎます。
+キー位置による解除は、従来通りそのコールバックが戻る前に行います。
+[カーネル回帰テストと確認範囲](tests/transition-lock/README.md)を参照してください。
+
 ZMK 標準の input processor を、実行中に設定変更できるようにしたものです。
 
 ZMK には設定可能な input processor が 4 つ(scaler、transform、code-mapper、
@@ -669,3 +675,11 @@ module の構成、正しさの規則、必要なテスト、ローカル checko
 
 コントリビューションを歓迎します。[.github/CONTRIBUTING.md](.github/CONTRIBUTING.md)
 に記載したコーディングパターンと規約に従ってください。
+
+
+## Current test entry points (2026-10-05)
+
+See [the module-owned test guide](tests/README.md). The default host command
+executes every behavior scenario once under ASan/UBSan. Set `ZMK_TEST_MODE=full`
+for all retained coverage/ABI variants. Legacy simulation has been removed
+from the active suite; its source/snapshots remain externally archived.

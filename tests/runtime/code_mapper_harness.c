@@ -28,6 +28,7 @@ static const struct device *const runtime_code_mapper_devices[] = {&first_device
 #define ZMK_INPUT_PROC_CONTINUE 0
 #define ARG_UNUSED(x) ((void)(x))
 #define LOG_DBG(...) ((void)0)
+#define LOG_INF(...) ((void)0)
 static int atomic_get(const atomic_t *value) { return *value; }
 static void atomic_set(atomic_t *value, int next) { *value = next; }
 static bool runtime_code_mapper_device_valid(const struct device *dev);

@@ -29,6 +29,7 @@ static const struct device *const runtime_scaler_devices[] = {&first_device, &va
 #define ZMK_INPUT_PROC_CONTINUE 0
 #define ARG_UNUSED(x) ((void)(x))
 #define LOG_DBG(...) ((void)0)
+#define LOG_INF(...) ((void)0)
 #define LOG_WRN(...) ((void)0)
 static atomic_val_t atomic_get(const atomic_t *value) { return *value; }
 static void atomic_set(atomic_t *value, atomic_val_t next) { *value = next; }

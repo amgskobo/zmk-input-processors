@@ -27,7 +27,10 @@
 
 #include "input_processors_custom_settings.h"
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+#ifndef CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL
+#define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
+#endif
+LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_code_mapper_custom_settings, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
 
 /*
  * The devicetree property is start-disabled rather than enabled because a

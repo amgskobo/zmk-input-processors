@@ -30,6 +30,7 @@ static const struct device *const runtime_transform_devices[] = {&first_device, 
 #define ZMK_INPUT_PROC_CONTINUE 0
 #define ARG_UNUSED(x) ((void)(x))
 #define LOG_DBG(...) ((void)0)
+#define LOG_INF(...) ((void)0)
 enum runtime_transform_flag_bit {
     RUNTIME_TRANSFORM_XY_SWAP_BIT,
     RUNTIME_TRANSFORM_X_INVERT_BIT,

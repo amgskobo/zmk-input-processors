@@ -70,6 +70,8 @@ static const struct device *const runtime_temp_layer_devices[] = {&first_device,
 static struct k_work_q lowprio_queue;
 static int64_t now_ms;
 static int lock_failures;
+static struct k_mutex *fail_on_mutex;
+static struct k_mutex runtime_temp_layer_transition_lock;
 static uint32_t active_layers;
 static uint32_t locked_layers;
 static int layer_events;
@@ -86,6 +88,10 @@ static int64_t k_uptime_get(void) { return now_ms; }
 static void k_mutex_init(struct k_mutex *mutex) { mutex->depth = 0; }
 static int k_mutex_lock(struct k_mutex *mutex, k_timeout_t timeout) {
     ARG_UNUSED(timeout);
+    if (mutex == fail_on_mutex) {
+        fail_on_mutex = NULL;
+        return -EAGAIN;
+    }
     if (lock_failures > 0) {
         lock_failures--;
         return -EAGAIN;
@@ -515,6 +521,34 @@ static void test_events(void) {
     assert(!data.is_active);
 }
 
+static void test_transition_lock_cleanup(void) {
+    data.params = params_of(true, 2, 100, 0);
+    data.is_active = false;
+    assert(input() == 0);
+    fail_on_mutex = &data.lock;
+    run_activate();
+    assert(data.activation_pending && !data.is_active);
+    assert(runtime_temp_layer_transition_lock.depth == 0);
+    run_activate();
+    assert(data.is_active);
+
+    data.force_deactivate = true;
+    fail_on_mutex = &data.lock;
+    run_deactivate();
+    assert(data.is_active && data.force_deactivate);
+    assert(runtime_temp_layer_transition_lock.depth == 0);
+    run_deactivate();
+    assert(!data.is_active);
+
+    raise_by_input();
+    fail_on_mutex = &data.lock;
+    assert(position(0, true) == 0);
+    assert(data.is_active);
+    assert(runtime_temp_layer_transition_lock.depth == 0);
+    assert(position(0, true) == 0);
+    assert(!data.is_active && runtime_temp_layer_transition_lock.depth == 0);
+}
+
 int main(void) {
     static const uint16_t excluded[] = {7, 9};
     static const uint16_t blockers[] = {5, 6};
@@ -529,7 +563,9 @@ int main(void) {
     test_activation_guards();
     test_settings_while_held();
     test_events();
+    test_transition_lock_cleanup();
     assert(data.lock.depth == 0);
+    assert(runtime_temp_layer_transition_lock.depth == 0);
     /* Every device in the list counts, the first as much as the last. */
     assert(runtime_temp_layer_device_valid(&first_device));
     puts("runtime temp layer driver: PASS");

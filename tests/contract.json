@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "host": [
+    "bash",
+    "tests/run-docker.sh"
+  ],
+  "contracts": [
+    {
+      "fixture": "tests/runtime/transform_harness.c",
+      "asserts": "Transform event behavior and independent stream state"
+    },
+    {
+      "fixture": "tests/runtime/scaler_harness.c",
+      "asserts": "Scaling and remainder behavior"
+    },
+    {
+      "fixture": "tests/runtime/code_mapper_harness.c",
+      "asserts": "Code routing and state transitions"
+    },
+    {
+      "fixture": "tests/runtime/temp_layer_harness.c",
+      "asserts": "Layer ownership, guards and deadlines"
+    },
+    {
+      "fixture": "tests/runtime/custom_settings_harness.c",
+      "asserts": "Settings bridge and validation"
+    }
+  ],
+  "limits": "Host tests do not compile all DTS combinations; retain owner negative guards and native fixtures for changed interfaces.",
+  "kernel": ["bash", "tests/run-native.sh", "<resolved-west-workspace>"],
+  "kernel_contracts": [
+    {
+      "fixture": "tests/integration/runtime/module/src/drivers_test.c",
+      "asserts": "Nineteen existing native processor groups, including pending-work disable/settings updates and layer/deadline state; unchanged snapshot"
+    },
+    {
+      "fixture": "tests/integration/runtime/dual_route/keycode_events.snapshot",
+      "asserts": "Existing real input-thread replay in both first-touch orders, exact pointer/scroll report values and order, role handoff, and timed layer release; six PASS groups with unchanged snapshot"
+    }
+  ],
+  "execution": {
+    "default": "quick: every behavioral fixture and scenario under ASan/UBSan once",
+    "full": "ZMK_TEST_MODE=full: same scenarios plus optimized, coverage and existing 32-bit variants",
+    "integration": "owner native/DTS/API guards when interfaces or kernel contracts change; not a prerequisite for pure host behavior",
+    "transport": "actual ordered USB/BLE/split/power/reset evidence; archived simulation is not a passing substitute"
+  },
+  "infrastructure": {
+    "fixtures": [
+      {
+        "fixture": "tests/test_runtime_coverage.py",
+        "asserts": "Real full runtime entry rejects empty, unrelated and partially measured coverage with recording tools; normal full entry retains actual per-function line and branch measurement"
+      },
+      {
+        "fixture": "tests/integration/test_offline.py",
+        "asserts": "Exact supported core/dependency pins, clean sources, missing inputs, nonoverlapping project paths separate from west/config metadata, fresh output outside source/dependency roots including symlink aliases, and parseable wrong custom-settings archive; identity/archive-digest bypass negative controls"
+      },
+      {
+        "fixture": "tests/integration/test_output_guard.py",
+        "asserts": "Existing directories, directory symlinks and dangling symlinks preserve prior evidence and invoke no west command"
+      }
+    ],
+    "entry": "tests/integration/run.sh",
+    "preparation": "Explicit pinned offline workspace; local unchanged ZMK clone and original fixture manifest; no fetch or source repair",
+    "limits": "Admission tests control dependency responses. Actual native/API/firmware fixtures separately verify unchanged stock ZMK and DYA. Physical transport remains separate."
+  }
+}

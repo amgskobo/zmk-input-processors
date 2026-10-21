@@ -14,6 +14,13 @@
 
 set -euo pipefail
 
+mode="${ZMK_TEST_MODE:-quick}"
+case "$mode" in
+    quick|full) ;;
+    *) echo "ZMK_TEST_MODE must be quick or full" >&2; exit 2 ;;
+esac
+export ZMK_TEST_MODE="$mode"
+
 repo_root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 build_dir="$(mktemp -d "${TMPDIR:-/tmp}/zmk-input-processors-test.XXXXXX")"
 
@@ -55,6 +62,9 @@ variants=(
     "coverage:-O0 --coverage"
     "32-bit:-O2 -m32"
 )
+if [ "$mode" = quick ]; then
+    variants=("sanitized:-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all")
+fi
 
 # Nothing here allocates, and LeakSanitizer needs ptrace, which containers
 # commonly deny.
@@ -75,6 +85,7 @@ for source in "$repo_root"/tests/unit/test_*.c; do
     done
 done
 
+if [ "$mode" = full ]; then
 coverage_report="$(cd "$build_dir" && gcov -b -c *coverage*.gcno)"
 printf '%s\n' "$coverage_report"
 for core in runtime_code_mapper_math runtime_scaler_math runtime_temp_layer_policy runtime_transform_math; do
@@ -83,4 +94,8 @@ for core in runtime_code_mapper_math runtime_scaler_math runtime_temp_layer_poli
     printf '%s\n' "$core_report" | grep -Fq 'Taken at least once:100.00%'
 done
 
+fi
+
 python3 "$repo_root/tests/runtime/run.py"
+python3 -m unittest discover -s "$repo_root/tests" -p 'test_*.py' -v
+python3 -m unittest discover -s "$repo_root/tests/integration" -p 'test_*.py' -v

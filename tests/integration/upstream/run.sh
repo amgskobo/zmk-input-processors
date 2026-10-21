@@ -17,6 +17,11 @@ upstream_dir="$ZMK_TEST_WORK_DIR/upstream"
 # for the DYA workspace would turn every west command here onto that one.
 unset ZEPHYR_BASE
 
+if [ -n "${ZMK_TEST_OFFLINE_WORKSPACE:-}" ]; then
+    upstream_dir="$(python3 /src/tests/integration/offline.py "${ZMK_TEST_OFFLINE_UPSTREAM_WORKSPACE:?set the upstream workspace}" upstream /src/tests/integration/upstream/west.yml "$ZMK_TEST_WORK_DIR/upstream-inputs")"
+    cd "$upstream_dir"
+    west zephyr-export
+else
 mkdir -p "$upstream_dir/config"
 cp /src/tests/integration/upstream/west.yml "$upstream_dir/config/west.yml"
 cd "$upstream_dir"
@@ -26,6 +31,8 @@ if [ ! -d .west ]; then
 fi
 west update --narrow --fetch-opt=--depth=1 --path-cache "$ZMK_TEST_DYA_WORKSPACE"
 west zephyr-export
+
+fi
 
 export ZEPHYR_BASE="$upstream_dir/zephyr"
 export ZMK_TEST_ZMK_APP="$upstream_dir/zmk/app"

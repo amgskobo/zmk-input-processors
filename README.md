@@ -437,6 +437,16 @@ updates also advance a generation counter before waiting for the worker lock;
 the worker checks it before and after activation and immediately undoes an
 activation if an edit arrived while layer events were being dispatched.
 
+Layer transitions take a module-wide transition mutex before an instance's
+mutex. ZMK synchronously notifies all instances during a layer change, so
+independent instances must use that order even when activation runs on the
+worker and a position-triggered drop runs on the input thread. This prevents
+the two callbacks from holding A and B while each waits for the other. A
+position-triggered drop still completes synchronously before the callback
+returns. Ordinary reads, parameter updates and input admission keep their
+instance-local locks. The [focused kernel regression](tests/transition-lock/README.md)
+pins the concurrent transition and unchanged layer ownership.
+
 `excluded-positions` stays structural. A list of key positions is not something
 a generic settings list can draw, and it belongs to the physical layout rather
 than to taste. Omitting the property disables position-based dropping entirely,
@@ -696,3 +706,11 @@ parameter and its optional Studio publication.
 ## Contributing
 
 Contributions are welcome! Please follow the coding patterns and conventions documented in [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
+
+
+## Current test entry points (2026-10-05)
+
+See [the module-owned test guide](tests/README.md). The default host command
+executes every behavior scenario once under ASan/UBSan. Set `ZMK_TEST_MODE=full`
+for all retained coverage/ABI variants. Legacy simulation has been removed
+from the active suite; its source/snapshots remain externally archived.
