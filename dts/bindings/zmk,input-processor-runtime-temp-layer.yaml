@@ -52,6 +52,9 @@ properties:
       Do not raise this layer while any listed layer is active. The check runs
       when queued activation work executes, so two pointer sources reporting
       before that work runs cannot both claim mutually exclusive roles.
+      Every entry must name an existing keymap layer ID; invalid entries fail
+      at build time before narrowing to internal storage. An empty list imposes
+      no blocker.
   start-disabled:
     type: boolean
     description: >-

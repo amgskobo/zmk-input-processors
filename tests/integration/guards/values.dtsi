@@ -59,6 +59,15 @@
         layer = <1>;
         timeout-ms = <60000>;
         require-prior-idle-ms = <60000>;
+        blocked-by-layers = <0 1>;
+    };
+
+    layer_empty_blockers {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <0>;
+        timeout-ms = <0>;
+        blocked-by-layers = <>;
     };
 };
 

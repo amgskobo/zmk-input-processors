@@ -27,6 +27,11 @@
     }
   ],
   "limits": "Host tests do not compile all DTS combinations; retain owner negative guards and native fixtures for changed interfaces.",
+  "blocked_layer_guards": {
+    "entry": "tests/integration/run.sh guards",
+    "fixtures": ["tests/integration/guards/blocked-layer-over", "tests/integration/guards/blocked-layer-negative", "tests/integration/guards/blocked-layer-wrap"],
+    "asserts": "Named compile rejection before uint16_t narrowing for an invalid second element, negative ID and 65536; first/last valid IDs, explicit empty list and omitted property remain valid. All three invalid fixtures compile before repair."
+  },
   "kernel": [
     "bash",
     "tests/run-native.sh",

@@ -154,3 +154,13 @@ list, a cache symlink, module paths containing spaces, failed project discovery 
 an empty selection. The keep-ambient negative control must fail these assertions.
 Full integration retains all supported-core, role, persistence and invalid-DTS
 cases. No dependency is patched or required feature disabled.
+
+## Blocked-layer configuration guards
+
+The existing guards entry also requires named build rejection of an invalid
+second blocker, a negative blocker and 65536, which previously narrowed to zero.
+All three real-DTS cases compile before the repair and fail their missing-rejection
+checks. Every element is now validated before uint16_t storage conversion.
+The shared positive nodes accept the first/last valid layer IDs and an explicit
+empty list; normal firmware/native nodes retain the omitted-list case. The
+runtime initialization checks and every earlier guard/assertion remain.

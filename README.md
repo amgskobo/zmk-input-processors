@@ -407,7 +407,9 @@ events arriving before the queue runs leave the first layer active and the
 second unraised. The source using the unraised layer can take its listener's
 opposite-pointer scroll route. The property is structural; if a Studio edit
 changes either instance's target layer ID, update the blockers in devicetree
-as well. An out-of-range blocker prevents the processor device from starting.
+as well. Every blocker must name an existing keymap layer ID. Invalid values
+are rejected at build time, before conversion to the internal 16-bit list.
+An absent or empty list leaves activation unrestricted.
 
 `layer` is published with the `LAYER_ID` constraint, so a client draws the
 keymap's own layer list and the row reads "MOUSE (3)" rather than "3" — a

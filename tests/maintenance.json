@@ -13,6 +13,7 @@
     "Explicit offline integration: tests/integration/run.sh; see tests/README.md for pinned workspaces, variant selection and fresh outputs"
   ],
   "coverage_map": "tests/contract.json",
+  "blocked_layers": "Existing guards entry requires named real-DTS rejection of an invalid second element, negative ID and 65536 before uint16_t narrowing; positive first/last IDs, empty and omitted lists remain accepted. All three missing-rejection regressions fail before repair; prior guards and runtime init checks are retained.",
   "preserved_assertions": "Relocated fixtures retain their prior assertions; no snapshot auto-accept or unique assertion removal.",
   "execution": {
     "quick": "All behavioral scenarios once; sanitizer variants where supported.",

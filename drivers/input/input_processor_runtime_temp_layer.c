@@ -525,7 +525,14 @@ static const struct zmk_input_processor_driver_api runtime_temp_layer_driver_api
     .handle_event = runtime_temp_layer_handle_event,
 };
 
+#define RUNTIME_TEMP_LAYER_ASSERT_BLOCKER(idx, n)                                                 \
+    BUILD_ASSERT(DT_INST_PROP_BY_IDX(n, blocked_by_layers, idx) >= 0 &&                           \
+                     DT_INST_PROP_BY_IDX(n, blocked_by_layers, idx) < ZMK_KEYMAP_LAYERS_LEN,     \
+                 "blocked-by-layers must name existing keymap layer IDs");
+
 #define RUNTIME_TEMP_LAYER_INST(n)                                                                 \
+    LISTIFY(DT_INST_PROP_LEN_OR(n, blocked_by_layers, 0), RUNTIME_TEMP_LAYER_ASSERT_BLOCKER, (),  \
+            n)                                                                                    \
     BUILD_ASSERT(DT_INST_PROP(n, layer) >= 0 && DT_INST_PROP(n, layer) < ZMK_KEYMAP_LAYERS_LEN,    \
                  "layer must name a layer this keymap has");                                       \
     BUILD_ASSERT(DT_INST_PROP(n, timeout_ms) >= 0 &&                                               \
