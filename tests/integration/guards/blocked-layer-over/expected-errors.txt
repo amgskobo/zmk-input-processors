@@ -1,0 +1,2 @@
+# Invalid second element in a two-layer keymap.
+static assertion failed: "blocked-by-layers must name existing keymap layer IDs"

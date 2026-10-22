@@ -1,0 +1,2 @@
+# Negative ID before the uint16_t storage conversion.
+static assertion failed: "blocked-by-layers must name existing keymap layer IDs"

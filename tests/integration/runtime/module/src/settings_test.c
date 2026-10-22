@@ -23,6 +23,7 @@
 #include <drivers/input_processor.h>
 #include <zmk/event_manager.h>
 #include <zmk/keymap.h>
+#include <zmk/workqueue.h>
 
 #include <zmk-input-processors/custom_settings.h>
 #include <zmk-input-processors/runtime_code_mapper.h>
@@ -112,8 +113,8 @@ static void test_published(void) {
             published++;
         }
     }
-    /* The ten below, and the two keys each of the two twins publish. */
-    RT_EXPECT_EQ(&t, published, ARRAY_SIZE(expected) + 4, "settings under the subsystem");
+    /* Primary ten, four peer-layer fields, and two keys per twin scaler. */
+    RT_EXPECT_EQ(&t, published, ARRAY_SIZE(expected) + 8, "settings under the subsystem");
 
     for (size_t i = 0; i < ARRAY_SIZE(expected); i++) {
         const struct expected_setting *want = &expected[i];
@@ -287,6 +288,111 @@ static void test_temp_layer_writes(void) {
     rt_finish(&t);
 }
 
+K_SEM_DEFINE(settings_work_blocked,0,1);
+K_SEM_DEFINE(settings_work_resume,0,1);
+K_SEM_DEFINE(settings_work_done,0,1);
+static void settings_block_worker(struct k_work *work) {
+    ARG_UNUSED(work); k_sem_give(&settings_work_blocked);
+    __ASSERT_NO_MSG(k_sem_take(&settings_work_resume,K_SECONDS(1))==0);
+}
+static void settings_work_fence(struct k_work *work) {
+    ARG_UNUSED(work); k_sem_give(&settings_work_done);
+}
+K_WORK_DEFINE(settings_blocker,settings_block_worker);
+K_WORK_DEFINE(settings_fence,settings_work_fence);
+static void unrelated_write(struct runtime_test *t,unsigned target) {
+    static int32_t revision; revision++;
+    if(target==0) {
+        struct zmk_custom_setting_value value=ZMK_CUSTOM_SETTING_VALUE_INT32(2+revision);
+        RT_EXPECT_EQ(t,zmk_custom_setting_write(&aa_foreign_rt_scale_multiplier,&value,
+            ZMK_CUSTOM_SETTING_WRITE_MODE_MEMORY),0,"foreign subsystem edit");
+    } else if(target==1) {
+        RT_EXPECT_EQ(t,write_int("rt_scale.multiplier",2+revision),0,"peer processor edit");
+    } else {
+        RT_EXPECT_EQ(t,write_int("rt_layer_peer.timeout_ms",201+revision),0,"peer layer edit");
+    }
+}
+static void test_unrelated_layer_state(void) {
+    struct runtime_test t={.name="settings: unrelated edits preserve queued activation and idle deadline"};
+    struct k_work_q *queue=zmk_workqueue_lowprio_work_q();
+    for(unsigned target=0;target<3;target++) {
+        RT_EXPECT_EQ(&t,write_bool("rt_layer.enabled",false),0,"reset layer");
+        k_msleep(WORK_MS);
+        RT_EXPECT_EQ(&t,write_int("rt_layer.timeout_ms",120),0,"short deadline");
+        RT_EXPECT_EQ(&t,write_int("rt_layer.prior_idle_ms",0),0,"disable typing guard");
+        RT_EXPECT_EQ(&t,write_bool("rt_layer.enabled",true),0,"enable layer");
+        __ASSERT_NO_MSG(k_work_submit_to_queue(queue,&settings_blocker)>=0);
+        __ASSERT_NO_MSG(k_sem_take(&settings_work_blocked,K_SECONDS(1))==0);
+        struct input_event event={.type=INPUT_EV_REL,.code=INPUT_REL_X,.value=1};
+        struct zmk_input_processor_state state={0};
+        (void)zmk_input_processor_handle_event(layer,&event,0,0,&state);
+        unrelated_write(&t,target);
+        k_sem_give(&settings_work_resume);
+        __ASSERT_NO_MSG(k_work_submit_to_queue(queue,&settings_fence)>=0);
+        __ASSERT_NO_MSG(k_sem_take(&settings_work_done,K_SECONDS(1))==0);
+        RT_EXPECT_TRUE(&t,zmk_keymap_layer_active(LAYER),"queued activation survives edit");
+        k_msleep(80); unrelated_write(&t,target); k_msleep(60);
+        RT_EXPECT_FALSE(&t,zmk_keymap_layer_active(LAYER),"foreign edit cannot extend idle deadline");
+    }
+    RT_EXPECT_EQ(&t,write_int("rt_scale.multiplier",889),0,"restore scaler");
+    RT_EXPECT_EQ(&t,write_int("rt_layer.timeout_ms",200),0,"restore timeout");
+    RT_EXPECT_EQ(&t,write_int("rt_layer.prior_idle_ms",30),0,"restore idle");
+    rt_finish(&t);
+}
+
+K_SEM_DEFINE(settings_snapshot_ready,0,1);
+K_SEM_DEFINE(settings_snapshot_resume,0,1);
+K_SEM_DEFINE(settings_writers_done,0,2);
+K_THREAD_STACK_DEFINE(settings_stack_a,4096);
+K_THREAD_STACK_DEFINE(settings_stack_b,4096);
+static struct k_thread settings_thread_a,settings_thread_b;
+static const struct zmk_custom_setting *race_enabled,*race_delay;
+static atomic_t pause_settings_read;
+int __real_zmk_custom_setting_read(const struct zmk_custom_setting *,struct zmk_custom_setting_value *);
+int __wrap_zmk_custom_setting_read(const struct zmk_custom_setting *setting,
+                                  struct zmk_custom_setting_value *value) {
+    int rc=__real_zmk_custom_setting_read(setting,value);
+    if(rc==0 && setting==race_delay && k_current_get()==&settings_thread_a &&
+       atomic_cas(&pause_settings_read,1,0)) {
+        k_sem_give(&settings_snapshot_ready);
+        __ASSERT_NO_MSG(k_sem_take(&settings_snapshot_resume,K_SECONDS(1))==0);
+    }
+    return rc;
+}
+static void settings_writer(void *which,void *b,void *c) {
+    ARG_UNUSED(b); ARG_UNUSED(c);
+    struct zmk_custom_setting_value value;
+    const struct zmk_custom_setting *setting;
+    if(which==NULL) { setting=race_enabled; value=(struct zmk_custom_setting_value)ZMK_CUSTOM_SETTING_VALUE_BOOL(false); }
+    else { setting=race_delay; value=(struct zmk_custom_setting_value)ZMK_CUSTOM_SETTING_VALUE_INT32(0); }
+    __ASSERT_NO_MSG(zmk_custom_setting_write(setting,&value,ZMK_CUSTOM_SETTING_WRITE_MODE_MEMORY)==0);
+    k_sem_give(&settings_writers_done);
+}
+static void test_concurrent_settings(void) {
+
+    race_enabled=zmk_custom_setting_find(ZMK_INPUT_PROCESSORS_SUBSYSTEM,"rt_layer.enabled");
+    race_delay=zmk_custom_setting_find(ZMK_INPUT_PROCESSORS_SUBSYSTEM,"rt_layer.prior_idle_ms");
+    __ASSERT_NO_MSG(race_enabled!=NULL && race_delay!=NULL);
+    atomic_set(&pause_settings_read,1);
+    k_thread_create(&settings_thread_a,settings_stack_a,K_THREAD_STACK_SIZEOF(settings_stack_a),
+        settings_writer,NULL,NULL,NULL,1,0,K_NO_WAIT);
+    __ASSERT_NO_MSG(k_sem_take(&settings_snapshot_ready,K_SECONDS(1))==0);
+    k_thread_create(&settings_thread_b,settings_stack_b,K_THREAD_STACK_SIZEOF(settings_stack_b),
+        settings_writer,(void *)1,NULL,NULL,1,0,K_NO_WAIT);
+    /* Both writer threads outrank this test thread. B has now finished or
+     * blocked in the adapter, after its registry value was committed. */
+    struct zmk_custom_setting_value stored;
+    __ASSERT_NO_MSG(zmk_custom_setting_read(race_delay,&stored)==0 && stored.int32_value==0);
+    k_sem_give(&settings_snapshot_resume);
+    __ASSERT_NO_MSG(k_sem_take(&settings_writers_done,K_SECONDS(1))==0);
+    __ASSERT_NO_MSG(k_sem_take(&settings_writers_done,K_SECONDS(1))==0);
+    struct runtime_temp_layer_params params;
+    __ASSERT_NO_MSG(runtime_temp_layer_get_params(layer,&params)==0 && !params.enabled && params.require_prior_idle_ms==0);
+    __ASSERT_NO_MSG(write_bool("rt_layer.enabled",true)==0);
+    __ASSERT_NO_MSG(write_int("rt_layer.prior_idle_ms",30)==0);
+    printk("PASS: settings: concurrent registry edits cannot reapply an older snapshot\n");
+}
+
 static void test_reapplied_after_load(void) {
     struct runtime_test t = {
         .name = "settings: stored values are applied again when settings finish loading"};
@@ -330,6 +436,8 @@ static void run_tests(void *p1, void *p2, void *p3) {
     test_transform_writes();
     test_mapper_writes();
     test_temp_layer_writes();
+    test_unrelated_layer_state();
+    test_concurrent_settings();
     test_reapplied_after_load();
 
     exit(0);

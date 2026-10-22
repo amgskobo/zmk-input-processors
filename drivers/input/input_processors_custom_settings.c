@@ -31,7 +31,12 @@
 
 #include <zmk-input-processors/custom_settings.h>
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+#include "input_processors_custom_settings.h"
+
+#ifndef CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL
+#define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
+#endif
+LOG_MODULE_REGISTER(zmk_input_processors_input_processors_custom_settings, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
 
 static bool input_processors_namespace_handler(const zmk_custom_CallRequest *request,
                                                pb_callback_t *encode_response);
@@ -63,6 +68,32 @@ static bool input_processors_namespace_handler(const zmk_custom_CallRequest *req
     return false;
 }
 
+bool input_processors_read_bool(const struct zmk_custom_setting *setting, bool *out) {
+    struct zmk_custom_setting_value value;
+
+    if (zmk_custom_setting_read(setting, &value) != 0 ||
+        value.type != ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL) {
+        return false;
+    }
+
+    *out = value.bool_value;
+
+    return true;
+}
+
+bool input_processors_read_uint32(const struct zmk_custom_setting *setting, uint32_t *out) {
+    struct zmk_custom_setting_value value;
+
+    if (zmk_custom_setting_read(setting, &value) != 0 ||
+        value.type != ZMK_CUSTOM_SETTING_VALUE_TYPE_INT32 || value.int32_value < 0) {
+        return false;
+    }
+
+    *out = (uint32_t)value.int32_value;
+
+    return true;
+}
+
 /*
  * Two nodes can still produce one key, and nothing downstream would say so.
  *
@@ -86,12 +117,10 @@ static int input_processors_check_unique_keys(void) {
         }
 
         ZMK_CUSTOM_SETTING_FOREACH(other) {
-            if (other == setting) {
-                /* Only report a pair once: stop at the first of the two. */
-                break;
-            }
-
-            if (strcmp(other->custom_subsystem_id, ZMK_INPUT_PROCESSORS_SUBSYSTEM) == 0 &&
+            /* Only report a pair once: from the second of the two. Both point
+             * into the one linker section, so their order is their address. */
+            if (other < setting &&
+                strcmp(other->custom_subsystem_id, ZMK_INPUT_PROCESSORS_SUBSYSTEM) == 0 &&
                 strcmp(other->key, setting->key) == 0) {
                 LOG_ERR("Duplicate setting key \"%s\": two devicetree nodes share a "
                         "name, so only one of them is editable",

@@ -1,0 +1,4 @@
+name: input-processors-transition-lock-test
+build:
+  cmake: .
+  kconfig: Kconfig

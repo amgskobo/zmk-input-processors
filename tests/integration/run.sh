@@ -37,6 +37,12 @@ for suite in "${suites[@]}"; do
     esac
 done
 
+if [ -n "${ZMK_TEST_OFFLINE_WORKSPACE:-}" ]; then
+    work_dir="${ZMK_TEST_OUTPUT:?set ZMK_TEST_OUTPUT to a fresh evidence directory}"
+    if [ -e "$work_dir" ]; then echo "output already exists: $work_dir" >&2; exit 2; fi
+    dya_dir="$(python3 /src/tests/integration/offline.py "$ZMK_TEST_OFFLINE_WORKSPACE" dya "$tests_dir/config/west.yml" "$work_dir/dya-inputs")"
+    cd "$dya_dir"
+else
 if [ -n "${ZMK_TEST_WORKSPACE:-}" ]; then
     work_dir="$ZMK_TEST_WORKSPACE"
     mkdir -p "$work_dir"
@@ -62,9 +68,13 @@ fi
 # tags. West resolves the imported project names only during a plain update,
 # so this is intentionally broad but narrow and shallow.
 west update --narrow --fetch-opt=--depth=1
+fi
 # ZMK's app finds Zephyr through the CMake package registry, not ZEPHYR_BASE.
 west zephyr-export
 export ZEPHYR_BASE="$dya_dir/zephyr"
+source "/src/tests/integration/workspace-env.sh"
+zmk_test_select_workspace "$dya_dir"
+
 export ZMK_TEST_WORK_DIR="$work_dir"
 export ZMK_TEST_DYA_WORKSPACE="$dya_dir"
 export ZMK_TEST_ZMK_APP="$dya_dir/zmk/app"

@@ -4,6 +4,12 @@
 
 [English](README.md)
 
+仮レイヤーの変更は、全インスタンス共通のロックを取ってから各インスタンスの
+ロックを取ります。ワーカーからの有効化と、別インスタンスのキー位置による解除が
+同時に起きても、同期的なレイヤー通知を通じて互いを待ち続ける状態を防ぎます。
+キー位置による解除は、従来通りそのコールバックが戻る前に行います。
+[カーネル回帰テストと確認範囲](tests/transition-lock/README.md)を参照してください。
+
 ZMK 標準の input processor を、実行中に設定変更できるようにしたものです。
 
 ZMK には設定可能な input processor が 4 つ(scaler、transform、code-mapper、
@@ -397,7 +403,9 @@ pointer_layer: pointer_layer {
 実行する際に行うため、同じ処理待ちの間に両方から入力が届いても、先に有効化された
 レイヤーだけが残ります。有効化されなかった側は listener の別経路にできます。
 これは devicetree の構造的な値です。Studio で対象レイヤー ID を変更した場合は
-遮断側の指定も更新してください。範囲外の ID は初期化時に拒否されます。
+遮断側の指定も更新してください。各 ID は keymap に存在するレイヤーを指定します。
+不正な値は内部の 16 bit 配列へ変換する前に、ビルド時に拒否されます。
+省略または空の一覧では、この条件による有効化の抑止はありません。
 
 `layer` は `LAYER_ID` 制約付きで公開されるため、client は keymap 自身のレイヤー
 一覧を表示し、行は「3」ではなく「MOUSE (3)」のように表示されます。レイヤーは、
@@ -551,8 +559,9 @@ root にある module の node と同じ名前を持つことがあります。�
   読み込まれた値はこの event なしで registry に適用されるため、この event だけを
   待つ listener も保存済みの値を受け取れません。
 
-そのため各設定ファイルは両方の event を購読し、すべての instance を読み直します。
-これで起動時とその後のすべての編集に対応します。`CONFIG_SETTINGS` のない
+そのため各設定ファイルは両方の event を購読します。起動時は全 instance を読み直し、
+個別の編集時はその設定を持つ instance だけへ適用します。別の processor や
+subsystem の編集で、待機中のレイヤー有効化を中止したり、解除期限を延長したりしません。`CONFIG_SETTINGS` のない
 ビルドではこの event は発生しませんが、それで正しい動作です。何も保存されておらず、
 driver はすでに devicetree の値で動いているからです。
 
@@ -612,11 +621,19 @@ bash ./tests/run-integration-docker.sh
 `run-docker.sh` は `tests/unit/` の契約テストを実行します。driver が呼び出す、
 依存のないロジックのヘッダーごとに 1 つのプログラムがあります。それぞれを
 最適化ビルド、AddressSanitizer と UndefinedBehaviorSanitizer 付きのビルド、
-ファームウェアと同じ 32-bit プログラムの 3 通りでビルドし、ヘッダーは Zephyr なしで
+カバレッジ計測、ファームウェアと同じ 32-bit プログラムの 4 通りでビルドし、ヘッダーは Zephyr なしで
 `-Wconversion` 付きの単独コンパイルも通す必要があります。scaler は、反転を発見した
 実機セッションで記録した値、参照モデル、100 万件のランダムケース、移動量が失われも
 増えもしないという不変条件で検査します。transform、code map、temp-layer policy は
 入力の全範囲で検査します。
+CIは4つの純粋な算術・ポリシーヘッダーの行・分岐100%を要求します。
+同じコマンドで、製品driverから関数を抽出して `tests/runtime/` のスタブ付きハーネスに
+組み込みます。code mapperから5関数、scalerから8関数、transformから7関数、temp layerから
+13関数(work item、設定の書き込み、キー・position・layer event)、共通の設定読み出しと
+重複キー検査です。最適化、ASan/UBSan、カバレッジの3構成で実行し、ソースファイルごとに
+行・分岐100%を要求します。各processorの設定ブリッジとtemp layerのlistenerもマクロごと
+取り出し、ソースにゲートのない関数が1つでもあればrunnerが失敗します。devicetreeからの
+インスタンス生成とlistenerの登録そのものは、割合ではなく下記の統合suiteで確認します。
 
 `run-integration-docker.sh` は、`zmk-feature-custom-settings` を含む DYA ZMK fork と、
 それを含まない upstream ZMK を取得し(キーボード設定や他の input processor module は
@@ -661,3 +678,7 @@ module の構成、正しさの規則、必要なテスト、ローカル checko
 
 コントリビューションを歓迎します。[.github/CONTRIBUTING.md](.github/CONTRIBUTING.md)
 に記載したコーディングパターンと規約に従ってください。
+
+並行する設定通知は、読み取りから適用までを直列化します。古いスナップショットが
+後から新しい編集を上書きすることを防ぎます。追加のロックは設定通知だけで使い、
+通常の入力処理経路では使いません。

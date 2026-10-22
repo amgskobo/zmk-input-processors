@@ -11,14 +11,14 @@
  * publishing at all -- a pointer mounted the other way up is corrected in the
  * client instead of in a rebuild.
  *
- * This file owns persistence. The driver deliberately stores nothing, so
- * there is one owner for the value and no way for the two to disagree after a
- * reboot.
+ * This adapter publishes settings and applies coherent live snapshots.
+ * The custom-settings registry owns persistence; the driver owns live state.
  */
 
 #define DT_DRV_COMPAT zmk_input_processor_runtime_transform
 
 #include <zephyr/devicetree.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
 #include <cormoran/zmk/custom_settings.h>
@@ -27,7 +27,14 @@
 #include <zmk-input-processors/custom_settings.h>
 #include <zmk-input-processors/runtime_transform.h>
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+#include "input_processors_custom_settings.h"
+
+#ifndef CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL
+#define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
+#endif
+LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_transform_custom_settings, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
+
+static K_MUTEX_DEFINE(settings_lock);
 
 #define RUNTIME_TRANSFORM_SETTING(n, field, key)                                                   \
     ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
@@ -45,49 +52,35 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TRANSFORM_SETTINGS)
 
-static bool read_flag(const struct zmk_custom_setting *setting, bool *out) {
-    struct zmk_custom_setting_value value;
-
-    if (zmk_custom_setting_read(setting, &value) != 0 ||
-        value.type != ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL) {
-        return false;
-    }
-
-    *out = value.bool_value;
-
-    return true;
-}
-
 /*
  * Applied as a set. A client moving one at a time would otherwise put the
  * pointer through an orientation nobody chose, and a swap combined with a
  * stale inversion is a visibly wrong direction rather than a small error.
  */
 #define RUNTIME_TRANSFORM_APPLY(n)                                                                 \
-    {                                                                                              \
+    if (changed_setting == NULL || \
+        changed_setting == &runtime_transform_cs_xy_swap_##n || \
+        changed_setting == &runtime_transform_cs_x_invert_##n || \
+        changed_setting == &runtime_transform_cs_y_invert_##n) { \
         struct runtime_transform_flags flags;                                                      \
-                                                                                                   \
-        if (read_flag(&runtime_transform_cs_xy_swap_##n, &flags.xy_swap) &&                        \
-            read_flag(&runtime_transform_cs_x_invert_##n, &flags.x_invert) &&                      \
-            read_flag(&runtime_transform_cs_y_invert_##n, &flags.y_invert)) {                      \
+        if (input_processors_read_bool(&runtime_transform_cs_xy_swap_##n, &flags.xy_swap) &&       \
+            input_processors_read_bool(&runtime_transform_cs_x_invert_##n, &flags.x_invert) &&     \
+            input_processors_read_bool(&runtime_transform_cs_y_invert_##n, &flags.y_invert)) {     \
             (void)runtime_transform_set_flags(DEVICE_DT_INST_GET(n), &flags);                      \
         }                                                                                          \
     }
 
-static void runtime_transform_apply_settings(void) {
+static void runtime_transform_apply_settings(const struct zmk_custom_setting *changed_setting) {
+    /* Concurrent notifications must not apply an older snapshot last. */
+    k_mutex_lock(&settings_lock, K_FOREVER);
     DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TRANSFORM_APPLY)
+    k_mutex_unlock(&settings_lock);
 }
 
 static int runtime_transform_settings_event_cb(const zmk_event_t *eh) {
-    ARG_UNUSED(eh);
-
-    /*
-     * Both subscribed events mean the same thing here -- some stored value may
-     * now differ from what the processor is running -- and re-reading every
-     * instance is cheaper than working out which one moved.
-     */
-    runtime_transform_apply_settings();
-
+    const struct zmk_custom_setting_changed *changed = as_zmk_custom_setting_changed(eh);
+    /* Boot loads every node. An edit must not reset another node's live state. */
+    runtime_transform_apply_settings(changed == NULL ? NULL : changed->setting);
     return ZMK_EV_EVENT_BUBBLE;
 }
 

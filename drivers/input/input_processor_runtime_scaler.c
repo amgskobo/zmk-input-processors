@@ -30,7 +30,10 @@
 
 #include <zmk-input-processors/runtime_scaler.h>
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+#ifndef CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL
+#define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
+#endif
+LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_scaler, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
 
 struct runtime_scaler_config {
     uint8_t type;
@@ -90,7 +93,7 @@ int runtime_scaler_set_params(const struct device *dev, uint32_t multiplier, uin
     /* Both numbers move in one atomic word, so readers never see a mixed ratio. */
     atomic_set(&data->ratio, encode_ratio(multiplier, divisor));
 
-    LOG_DBG("%s: ratio now %u/%u", dev->name, multiplier, divisor);
+    LOG_INF("%s: ratio now %u/%u", dev->name, multiplier, divisor);
 
     return 0;
 }
@@ -101,8 +104,6 @@ static int scale_value(struct input_event *event, uint32_t multiplier, uint32_t 
 
     event->value = runtime_scaler_scale(original, multiplier, divisor,
                                         state != NULL ? state->remainder : NULL);
-
-    LOG_DBG("scaled %d by %u/%u to %d", original, multiplier, divisor, event->value);
 
     return ZMK_INPUT_PROC_CONTINUE;
 }

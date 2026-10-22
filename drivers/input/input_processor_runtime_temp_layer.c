@@ -50,7 +50,10 @@
 #include <zmk-input-processors/runtime_temp_layer.h>
 #include <zmk-input-processors/runtime_temp_layer_policy.h>
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+#ifndef CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL
+#define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
+#endif
+LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_temp_layer, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
 
 struct runtime_temp_layer_config {
     const uint16_t *excluded_positions;
@@ -84,8 +87,14 @@ struct runtime_temp_layer_data {
     struct k_work_delayable deactivate_work;
 };
 
+/* Layer changes synchronously notify every instance. Serialize transitions
+ * before taking an instance lock: otherwise activation on the worker can hold
+ * A while a position callback holds B, and both notifications wait for the
+ * other instance. Ordinary parameter/read/input paths keep their local locks. */
+static K_MUTEX_DEFINE(runtime_temp_layer_transition_lock);
+
 /*
- * Caller holds the lock.
+ * Caller holds the transition lock, then this instance's lock.
  *
  * is_active is written before the call and corrected after it, and both halves
  * matter.
@@ -135,7 +144,11 @@ static void activate_work_cb(struct k_work *work) {
         CONTAINER_OF(work, struct runtime_temp_layer_data, activate_work);
     const struct runtime_temp_layer_config *config = data->dev->config;
 
+    if (k_mutex_lock(&runtime_temp_layer_transition_lock, K_FOREVER) < 0) {
+        return;
+    }
     if (k_mutex_lock(&data->lock, K_FOREVER) < 0) {
+        k_mutex_unlock(&runtime_temp_layer_transition_lock);
         return;
     }
 
@@ -167,6 +180,7 @@ static void activate_work_cb(struct k_work *work) {
     data->activation_pending = false;
 
     k_mutex_unlock(&data->lock);
+    k_mutex_unlock(&runtime_temp_layer_transition_lock);
 }
 
 static void deactivate_work_cb(struct k_work *work) {
@@ -174,7 +188,11 @@ static void deactivate_work_cb(struct k_work *work) {
     struct runtime_temp_layer_data *data =
         CONTAINER_OF(delayable, struct runtime_temp_layer_data, deactivate_work);
 
+    if (k_mutex_lock(&runtime_temp_layer_transition_lock, K_FOREVER) < 0) {
+        return;
+    }
     if (k_mutex_lock(&data->lock, K_FOREVER) < 0) {
+        k_mutex_unlock(&runtime_temp_layer_transition_lock);
         return;
     }
 
@@ -196,6 +214,7 @@ static void deactivate_work_cb(struct k_work *work) {
     }
 
     k_mutex_unlock(&data->lock);
+    k_mutex_unlock(&runtime_temp_layer_transition_lock);
 }
 
 static bool runtime_temp_layer_device_valid(const struct device *dev);
@@ -334,14 +353,18 @@ static int handle_position_state_changed(const struct device *dev,
         return ZMK_EV_EVENT_BUBBLE;
     }
 
+    if (k_mutex_lock(&runtime_temp_layer_transition_lock, K_FOREVER) < 0) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
     if (k_mutex_lock(&data->lock, K_FOREVER) < 0) {
+        k_mutex_unlock(&runtime_temp_layer_transition_lock);
         return ZMK_EV_EVENT_BUBBLE;
     }
 
     const bool excluded = position_is_excluded(config, ev->position);
 
-    if (runtime_temp_layer_should_drop_for_position(data->is_active, ev->state,
-                                                    config->num_positions > 0, excluded)) {
+    /* Only instances with an exclusion list get this far: see the return above. */
+    if (runtime_temp_layer_should_drop_for_position(data->is_active, ev->state, true, excluded)) {
         set_layer_locked(data, false);
         data->deactivate_at = 0;
         data->force_deactivate = false;
@@ -352,6 +375,7 @@ static int handle_position_state_changed(const struct device *dev,
     }
 
     k_mutex_unlock(&data->lock);
+    k_mutex_unlock(&runtime_temp_layer_transition_lock);
 
     return ZMK_EV_EVENT_BUBBLE;
 }
@@ -501,7 +525,14 @@ static const struct zmk_input_processor_driver_api runtime_temp_layer_driver_api
     .handle_event = runtime_temp_layer_handle_event,
 };
 
+#define RUNTIME_TEMP_LAYER_ASSERT_BLOCKER(idx, n)                                                 \
+    BUILD_ASSERT(DT_INST_PROP_BY_IDX(n, blocked_by_layers, idx) >= 0 &&                           \
+                     DT_INST_PROP_BY_IDX(n, blocked_by_layers, idx) < ZMK_KEYMAP_LAYERS_LEN,     \
+                 "blocked-by-layers must name existing keymap layer IDs");
+
 #define RUNTIME_TEMP_LAYER_INST(n)                                                                 \
+    LISTIFY(DT_INST_PROP_LEN_OR(n, blocked_by_layers, 0), RUNTIME_TEMP_LAYER_ASSERT_BLOCKER, (),  \
+            n)                                                                                    \
     BUILD_ASSERT(DT_INST_PROP(n, layer) >= 0 && DT_INST_PROP(n, layer) < ZMK_KEYMAP_LAYERS_LEN,    \
                  "layer must name a layer this keymap has");                                       \
     BUILD_ASSERT(DT_INST_PROP(n, timeout_ms) >= 0 &&                                               \

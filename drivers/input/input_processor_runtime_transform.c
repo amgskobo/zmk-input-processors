@@ -25,12 +25,14 @@
 #include <zmk-input-processors/runtime_transform.h>
 #include <zmk-input-processors/runtime_transform_math.h>
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+#ifndef CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL
+#define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
+#endif
+LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_transform, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
 
 struct runtime_transform_config {
     uint8_t type;
     size_t x_codes_len;
-    size_t y_codes_len;
     const uint16_t *x_codes;
     const uint16_t *y_codes;
     struct runtime_transform_flags defaults;
@@ -100,7 +102,7 @@ int runtime_transform_set_flags(const struct device *dev,
 
     atomic_set(&data->flags, encode_flags(flags));
 
-    LOG_DBG("%s: swap %d, invert x %d y %d", dev->name, flags->xy_swap, flags->x_invert,
+    LOG_INF("%s: swap %d, invert x %d y %d", dev->name, flags->xy_swap, flags->x_invert,
             flags->y_invert);
 
     return 0;
@@ -151,7 +153,6 @@ static const struct zmk_input_processor_driver_api runtime_transform_driver_api 
     static const struct runtime_transform_config runtime_transform_config_##n = {                  \
         .type = DT_INST_PROP_OR(n, type, INPUT_EV_REL),                                            \
         .x_codes_len = DT_INST_PROP_LEN(n, x_codes),                                               \
-        .y_codes_len = DT_INST_PROP_LEN(n, y_codes),                                               \
         .x_codes = runtime_transform_x_codes_##n,                                                  \
         .y_codes = runtime_transform_y_codes_##n,                                                  \
         .defaults =                                                                                \

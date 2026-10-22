@@ -407,7 +407,9 @@ events arriving before the queue runs leave the first layer active and the
 second unraised. The source using the unraised layer can take its listener's
 opposite-pointer scroll route. The property is structural; if a Studio edit
 changes either instance's target layer ID, update the blockers in devicetree
-as well. An out-of-range blocker prevents the processor device from starting.
+as well. Every blocker must name an existing keymap layer ID. Invalid values
+are rejected at build time, before conversion to the internal 16-bit list.
+An absent or empty list leaves activation unrestricted.
 
 `layer` is published with the `LAYER_ID` constraint, so a client draws the
 keymap's own layer list and the row reads "MOUSE (3)" rather than "3" — a
@@ -436,6 +438,16 @@ therefore cannot raise the layer after the event that cancelled it. Parameter
 updates also advance a generation counter before waiting for the worker lock;
 the worker checks it before and after activation and immediately undoes an
 activation if an edit arrived while layer events were being dispatched.
+
+Layer transitions take a module-wide transition mutex before an instance's
+mutex. ZMK synchronously notifies all instances during a layer change, so
+independent instances must use that order even when activation runs on the
+worker and a position-triggered drop runs on the input thread. This prevents
+the two callbacks from holding A and B while each waits for the other. A
+position-triggered drop still completes synchronously before the callback
+returns. Ordinary reads, parameter updates and input admission keep their
+instance-local locks. The [focused kernel regression](tests/transition-lock/README.md)
+pins the concurrent transition and unchanged layer ownership.
 
 `excluded-positions` stays structural. A list of key positions is not something
 a generic settings list can draw, and it belongs to the physical layout rather
@@ -572,8 +584,10 @@ are easy to get wrong:
   from storage are applied to the registry without it, so a listener on that
   event alone would never see a stored value either.
 
-Each settings file therefore subscribes to both events and re-reads every
-instance, which covers boot and every later edit. In a build without
+Each settings file therefore subscribes to both events. Initialization re-reads
+every instance; a changed-setting event applies only to the instance owning that
+descriptor. Editing another processor or subsystem cannot cancel a queued
+temporary-layer activation or extend its idle deadline. In a build without
 `CONFIG_SETTINGS` the event never fires, which is correct: nothing was stored,
 and the drivers already start from their devicetree values.
 
@@ -631,14 +645,27 @@ bash ./tests/run-integration-docker.sh
 ```
 
 `run-docker.sh` runs the contract tests in `tests/unit/`, one program for each
-header of dependency-free logic the drivers call. Each is built three ways --
-optimised, under AddressSanitizer and UndefinedBehaviorSanitizer, and as a
-32-bit program like the firmware it models -- and the headers also have to
+header of dependency-free logic the drivers call. Each is built four ways --
+optimised, under AddressSanitizer and UndefinedBehaviorSanitizer, with
+coverage instrumentation, and as a 32-bit program like the firmware it models
+-- and the headers also have to
 compile on their own, free of Zephyr, under `-Wconversion`. The scaler is
 checked against values pinned from the hardware session that found the
 reversal, a reference model, a million random cases, and the invariant that no
 movement is lost or invented. The transform, the code map and the temp-layer
 policy are checked across their whole input domains.
+CI requires 100% line and branch coverage of the four pure math/policy
+headers. The same command then lifts production functions out of the drivers
+into the stubbed harnesses in `tests/runtime/` -- five from the code mapper,
+eight from the scaler, seven from the transform, thirteen from the temp layer
+(its work items, settings writes and key, position and layer events), and the
+shared setting readers and duplicate-key check -- runs each optimized, under
+ASan/UBSan and with coverage, and requires 100% line and branch coverage of
+each source file separately. Each processor's settings bridge and the temp
+layer's listener are lifted with their macros too, and the runner fails if
+any function in the sources has no gate. Devicetree instantiation and the
+listener registrations themselves are covered by the integration suites
+below rather than by a percentage.
 
 `run-integration-docker.sh` fetches the DYA ZMK fork with
 `zmk-feature-custom-settings`, and upstream ZMK without it -- and no keyboard
@@ -683,3 +710,7 @@ parameter and its optional Studio publication.
 ## Contributing
 
 Contributions are welcome! Please follow the coding patterns and conventions documented in [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
+
+Concurrent settings notifications serialize their complete read/apply transactions,
+so an older snapshot cannot overwrite a later edit. Input processing keeps its
+existing locks; the additional adapter lock is used only for settings events.
