@@ -27,7 +27,11 @@
     }
   ],
   "limits": "Host tests do not compile all DTS combinations; retain owner negative guards and native fixtures for changed interfaces.",
-  "kernel": ["bash", "tests/run-native.sh", "<resolved-west-workspace>"],
+  "kernel": [
+    "bash",
+    "tests/run-native.sh",
+    "<resolved-west-workspace>"
+  ],
   "kernel_contracts": [
     {
       "fixture": "tests/integration/runtime/module/src/drivers_test.c",
@@ -62,5 +66,9 @@
     "entry": "tests/integration/run.sh",
     "preparation": "Explicit pinned offline workspace; local unchanged ZMK clone and original fixture manifest; no fetch or source repair",
     "limits": "Admission tests control dependency responses. Actual native/API/firmware fixtures separately verify unchanged stock ZMK and DYA. Physical transport remains separate."
-  }
+  },
+  "suppression_scope": "No button-pair/final-frame policy is owned here. Existing transform/layer/settings fixtures remain unchanged; AKKB relative-motion configuration composes with an independent final filter.",
+  "scheduled_work_settings_review": "All four adapters now dispatch a changed descriptor only to its owning instance; initialization still applies every instance. The host bridge stand-in carries descriptor identity and covers foreign events and every own field. The DYA settings fixture uses the actual registry and worker queue: foreign-subsystem, same-subsystem scaler and peer-layer edits must preserve queued activation and the original idle deadline. Every write changes its value so notification suppression cannot hide this regression. Its snapshot adds the named unrelated-edit scenario; all prior lines remain. Direct temporary-layer API setters retain their documented reset behavior.",
+  "concurrent_settings": "Each adapter serializes its complete registry read/apply transaction. The real DYA settings fixture pauses a read in writer A, commits writer B from a higher priority Zephyr thread, and verifies that the older snapshot cannot win. This adds a second named settings scenario; all old snapshot lines remain. Linker wrapping controls the real registry boundary only in the owner test module.",
+  "selected_workspace": "Workspace selection uses tests/integration/workspace-env.sh to export the selected manifest's ZEPHYR_MODULES and explicit Zephyr package/base paths. A Zephyr symlink to a different cache must not select that cache's module providers. The owner test_workspace_env.py exercises actual selection with a poisoned ambient list, a cache symlink, module paths containing spaces, failed project discovery and an empty selection. The keep-ambient negative control must fail these assertions. Full integration retains all supported-core, role, persistence and invalid-DTS cases. No dependency is patched or required feature disabled."
 }

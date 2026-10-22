@@ -35,6 +35,9 @@ west zephyr-export
 fi
 
 export ZEPHYR_BASE="$upstream_dir/zephyr"
+source "/src/tests/integration/workspace-env.sh"
+zmk_test_select_workspace "$upstream_dir"
+
 export ZMK_TEST_ZMK_APP="$upstream_dir/zmk/app"
 export ZMK_TEST_BUILD_ROOT="$ZMK_TEST_WORK_DIR/build/upstream"
 export ZMK_TEST_CASES="drivers chain"

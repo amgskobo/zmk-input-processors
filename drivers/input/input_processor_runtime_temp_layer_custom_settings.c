@@ -11,14 +11,14 @@
  * settings list draws without any help. Publishing them is what lets someone
  * converge on values that suit them instead of guessing once at build time.
  *
- * This file owns persistence. The driver deliberately stores nothing, so
- * there is one owner for the value and no way for the two to disagree after a
- * reboot.
+ * This adapter publishes settings and applies coherent live snapshots.
+ * The custom-settings registry owns persistence; the driver owns live state.
  */
 
 #define DT_DRV_COMPAT zmk_input_processor_runtime_temp_layer
 
 #include <zephyr/devicetree.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
 #include <cormoran/zmk/custom_settings.h>
@@ -35,6 +35,8 @@
 #define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
 #endif
 LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_temp_layer_custom_settings, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
+
+static K_MUTEX_DEFINE(settings_lock);
 
 #define RUNTIME_TEMP_LAYER_SETTING(n, field, key, ...)                                             \
     ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
@@ -93,11 +95,14 @@ DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TEMP_LAYER_SETTINGS)
  * generations of the same edit.
  */
 #define RUNTIME_TEMP_LAYER_APPLY(n)                                                                \
-    {                                                                                              \
+    if (changed_setting == NULL || \
+        changed_setting == &runtime_temp_layer_cs_enabled_##n || \
+        changed_setting == &runtime_temp_layer_cs_layer_##n || \
+        changed_setting == &runtime_temp_layer_cs_timeout_ms_##n || \
+        changed_setting == &runtime_temp_layer_cs_require_prior_idle_ms_##n) { \
         struct runtime_temp_layer_params params;                                                   \
         uint32_t layer;                                                                            \
         uint32_t prior_idle;                                                                       \
-                                                                                                   \
         if (input_processors_read_bool(&runtime_temp_layer_cs_enabled_##n, &params.enabled) &&     \
             input_processors_read_uint32(&runtime_temp_layer_cs_layer_##n, &layer) &&              \
             input_processors_read_uint32(&runtime_temp_layer_cs_timeout_ms_##n,                    \
@@ -112,20 +117,17 @@ DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TEMP_LAYER_SETTINGS)
         }                                                                                          \
     }
 
-static void runtime_temp_layer_apply_settings(void) {
+static void runtime_temp_layer_apply_settings(const struct zmk_custom_setting *changed_setting) {
+    /* Concurrent notifications must not apply an older snapshot last. */
+    k_mutex_lock(&settings_lock, K_FOREVER);
     DT_INST_FOREACH_STATUS_OKAY(RUNTIME_TEMP_LAYER_APPLY)
+    k_mutex_unlock(&settings_lock);
 }
 
 static int runtime_temp_layer_settings_event_cb(const zmk_event_t *eh) {
-    ARG_UNUSED(eh);
-
-    /*
-     * Both subscribed events mean the same thing here -- some stored value may
-     * now differ from what the processor is running -- and re-reading every
-     * instance is cheaper than working out which one moved.
-     */
-    runtime_temp_layer_apply_settings();
-
+    const struct zmk_custom_setting_changed *changed = as_zmk_custom_setting_changed(eh);
+    /* Boot loads every node. An edit must not reset another node's live state. */
+    runtime_temp_layer_apply_settings(changed == NULL ? NULL : changed->setting);
     return ZMK_EV_EVENT_BUBBLE;
 }
 

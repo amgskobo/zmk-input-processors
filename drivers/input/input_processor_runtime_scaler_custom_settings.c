@@ -18,6 +18,7 @@
 #define DT_DRV_COMPAT zmk_input_processor_runtime_scaler
 
 #include <zephyr/devicetree.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
 #include <cormoran/zmk/custom_settings.h>
@@ -32,6 +33,8 @@
 #define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
 #endif
 LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_scaler_custom_settings, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
+
+static K_MUTEX_DEFINE(settings_lock);
 
 #define RUNTIME_SCALER_SETTING(n, field, key, lo)                                                  \
     ZMK_CUSTOM_SETTING_DEFINE_WITH_CONSTRAINTS(                                                    \
@@ -55,30 +58,28 @@ DT_INST_FOREACH_STATUS_OKAY(RUNTIME_SCALER_SETTINGS)
  * multiplier is a visible jump rather than a rounding difference.
  */
 #define RUNTIME_SCALER_APPLY(n)                                                                    \
-    {                                                                                              \
+    if (changed_setting == NULL || \
+        changed_setting == &runtime_scaler_cs_multiplier_##n || \
+        changed_setting == &runtime_scaler_cs_divisor_##n) { \
         uint32_t multiplier;                                                                       \
         uint32_t divisor;                                                                          \
-                                                                                                   \
         if (input_processors_read_uint32(&runtime_scaler_cs_multiplier_##n, &multiplier) &&        \
             input_processors_read_uint32(&runtime_scaler_cs_divisor_##n, &divisor)) {              \
             (void)runtime_scaler_set_params(DEVICE_DT_INST_GET(n), multiplier, divisor);           \
         }                                                                                          \
     }
 
-static void runtime_scaler_apply_settings(void) {
+static void runtime_scaler_apply_settings(const struct zmk_custom_setting *changed_setting) {
+    /* Concurrent notifications must not apply an older snapshot last. */
+    k_mutex_lock(&settings_lock, K_FOREVER);
     DT_INST_FOREACH_STATUS_OKAY(RUNTIME_SCALER_APPLY)
+    k_mutex_unlock(&settings_lock);
 }
 
 static int runtime_scaler_settings_event_cb(const zmk_event_t *eh) {
-    ARG_UNUSED(eh);
-
-    /*
-     * Both subscribed events mean the same thing here -- some stored value may
-     * now differ from what the processor is running -- and re-reading every
-     * instance is cheaper than working out which one moved.
-     */
-    runtime_scaler_apply_settings();
-
+    const struct zmk_custom_setting_changed *changed = as_zmk_custom_setting_changed(eh);
+    /* Boot loads every node. An edit must not reset another node's live state. */
+    runtime_scaler_apply_settings(changed == NULL ? NULL : changed->setting);
     return ZMK_EV_EVENT_BUBBLE;
 }
 

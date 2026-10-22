@@ -557,8 +557,9 @@ root にある module の node と同じ名前を持つことがあります。�
   読み込まれた値はこの event なしで registry に適用されるため、この event だけを
   待つ listener も保存済みの値を受け取れません。
 
-そのため各設定ファイルは両方の event を購読し、すべての instance を読み直します。
-これで起動時とその後のすべての編集に対応します。`CONFIG_SETTINGS` のない
+そのため各設定ファイルは両方の event を購読します。起動時は全 instance を読み直し、
+個別の編集時はその設定を持つ instance だけへ適用します。別の processor や
+subsystem の編集で、待機中のレイヤー有効化を中止したり、解除期限を延長したりしません。`CONFIG_SETTINGS` のない
 ビルドではこの event は発生しませんが、それで正しい動作です。何も保存されておらず、
 driver はすでに devicetree の値で動いているからです。
 
@@ -676,10 +677,6 @@ module の構成、正しさの規則、必要なテスト、ローカル checko
 コントリビューションを歓迎します。[.github/CONTRIBUTING.md](.github/CONTRIBUTING.md)
 に記載したコーディングパターンと規約に従ってください。
 
-
-## Current test entry points (2026-10-05)
-
-See [the module-owned test guide](tests/README.md). The default host command
-executes every behavior scenario once under ASan/UBSan. Set `ZMK_TEST_MODE=full`
-for all retained coverage/ABI variants. Legacy simulation has been removed
-from the active suite; its source/snapshots remain externally archived.
+並行する設定通知は、読み取りから適用までを直列化します。古いスナップショットが
+後から新しい編集を上書きすることを防ぎます。追加のロックは設定通知だけで使い、
+通常の入力処理経路では使いません。

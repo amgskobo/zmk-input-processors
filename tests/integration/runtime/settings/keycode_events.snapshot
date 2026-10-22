@@ -8,4 +8,6 @@ PASS: settings: a value outside its declared range never reaches a driver
 PASS: settings: written orientation flags reach the transform
 PASS: settings: the written switch reaches the code mapper
 PASS: settings: written temp layer values reach the driver, and off drops the layer
+PASS: settings: unrelated edits preserve queued activation and idle deadline
+PASS: settings: concurrent registry edits cannot reapply an older snapshot
 PASS: settings: stored values are applied again when settings finish loading

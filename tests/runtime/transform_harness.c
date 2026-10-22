@@ -13,7 +13,7 @@ typedef int atomic_val_t;
 struct runtime_transform_flags { bool xy_swap, x_invert, y_invert; };
 struct runtime_transform_config {
     uint8_t type;
-    size_t x_codes_len, y_codes_len;
+    size_t x_codes_len;
     const uint16_t *x_codes, *y_codes;
     struct runtime_transform_flags defaults;
 };
@@ -74,7 +74,7 @@ int main(void) {
 
     static const uint16_t x_codes[] = {1}, y_codes[] = {2};
     struct runtime_transform_config config = {.type = 4, .x_codes_len = 1,
-                                               .y_codes_len = 1, .x_codes = x_codes,
+                                               .x_codes = x_codes,
                                                .y_codes = y_codes,
                                                .defaults = {.xy_swap = true}};
     struct runtime_transform_data data = {0};

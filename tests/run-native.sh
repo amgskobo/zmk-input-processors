@@ -12,6 +12,10 @@ if [ -e "$output" ] || [ -L "$output" ] || [ -e "$output.build.log" ]; then
 fi
 cd "$workspace"
 west zephyr-export
+export ZEPHYR_BASE="$workspace/zephyr"
+source "$repo/tests/integration/workspace-env.sh"
+zmk_test_select_workspace "$workspace"
+
 mkdir -p "$output"
 for case in drivers dual_route; do
   config="$repo/tests/integration/runtime/$case"

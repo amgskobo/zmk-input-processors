@@ -14,6 +14,7 @@ endif()
 
 if(CONFIG_ZMK_INPUT_PROCESSORS_TEST_SETTINGS)
     target_sources(app PRIVATE src/settings_test.c src/subsystem_test.c)
+    zephyr_link_libraries(-Wl,--wrap=zmk_custom_setting_read)
 endif()
 
 if(CONFIG_ZMK_INPUT_PROCESSORS_TEST_DEFAULTS)

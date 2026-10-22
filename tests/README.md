@@ -1,21 +1,14 @@
 # Module-owned tests
 
-Run from this checkout. Docker + Bash is the host entry point; no keyboard
-checkout, shared test dispatcher or simulator repository is required.
-
 ```bash
 bash tests/run-docker.sh
 ZMK_TEST_MODE=full bash tests/run-docker.sh
 ```
 
-On PowerShell, set `$env:ZMK_TEST_MODE="full"` for the second command
-and invoke Git Bash explicitly. Remove the variable for the default quick run.
-
-Quick executes **all behavioral fixtures and scenarios** once with
-AddressSanitizer/UndefinedBehaviorSanitizer. Full repeats those same assertions
-under the retained optimization, coverage and (where already present) 32-bit
-variants. CI uses quick for push/PR and full for scheduled/manual runs.
-Unknown mode values fail; there is no silent skipped success.
+Quick runs every host scenario under ASan/UBSan. Full retains optimized, coverage
+and 32-bit variants; unknown modes fail. Resolve/read actual dependencies first.
+[contract.json](contract.json) and [maintenance.json](maintenance.json) map the
+current fixtures, supported cores, entries and explicit gaps.
 
 ## Retained behavioral contracts
 
@@ -66,78 +59,47 @@ lock cleanup when a later local lock fails. See its
 [contract and limits](transition-lock/README.md). Existing native snapshots
 remain unchanged; these checks do not establish physical transport timing.
 
-## Retired legacy simulation
+## Responsibility map
 
-The active `tests/bsim` directory was removed on 2026-10-05. Before removal,
-every source and ordered snapshot was SHA256-verified in an external archive.
-Its retirement manifest retains the raw traces and assertion mapping. Archive
-locations belong to the consuming keyboard integration repository and are not
-a prerequisite for these module-owned checks.
-No failed snapshot was accepted as passing.
+No suppression history, button-pair ownership or final-filter dependency exists
+in this family. The state is already limited to each transformation or layer
+algorithm, so no production state/API/algorithm is removed in this review.
+The generic mapper/scaler/transform may intentionally operate on their configured
+event type. The AKKB set selects relative motion; it preserves source buttons.
+Do not change their generic public semantics to implement final suppression.
 
-| Retired case | Behavioral replacement | Transport boundary |
+| Responsibility | State retained | Small owner boundary |
 | --- | --- | --- |
-| two-sources | The owner fixtures above retain state/arithmetic/error assertions | Ordered physical split/HID/LED/battery delivery and timing: pending actual-device evidence |
+| Code mapping | Atomic enable + immutable pairs | unit/test_code_mapper.c and runtime/code_mapper_harness.c |
+| Ratios and rounding | Atomic ratio; caller-owned fractional remainder | unit/test_scaler.c and runtime/scaler_harness.c |
+| Code swap / inversion | Atomic flags + configured code sets | unit/test_transform.c and runtime/transform_harness.c |
+| Presence / typing / timed layer | Layer actually held, pending activation generation, timestamps/deadline, work and transition/local locks | unit/test_temp_layer_policy.c and runtime/temp_layer_harness.c |
+| Persistence / Studio | Shared validation and separate per-processor adapters | runtime/custom_settings_harness.c and *_settings_harness.c |
+| Real work/cross-instance lock ordering | Actual driver/kernel/keymap; three identical-binary runs when this boundary changes | run-native.sh and transition-lock/run.sh |
 
-For the affected case, exercise the same contact/layer/settings/power or
-congestion/reconnect transition on the production board. Capture each report
-value/order/timestamp and verify balanced releases and specified deadlines.
-Do not mark the archived exact radio trace as covered by a host stub.
+The runtime temporary layer is separate from edge-touch: it observes activity
+and typing/idle/excluded-position guards, and expires by time. Its generation,
+pending state and locks prevent stale work and cross-instance lock cycles; the
+common final filter cannot replace them. Settings remain necessary tuning, not
+suppression policy.
 
-## Current test ownership and compatibility
+## Offline integration
 
-Run the relevant public interface/build checks on both unchanged stock ZMK
-and DYA when this owner supports both. See the selected core in the manifest.
+Both unchanged stock ZMK and DYA are supported. Inside the pinned build image,
+mount this module at `/src` and provide explicitly resolved workspaces with a
+fresh output directory. The entry makes isolated unchanged ZMK clones and
+symlinks dependencies without fetching. The original manifests and exact clean
+core/Zephyr/library identities are checked before building.
 
-Canonical entries (run from the repository root):
-
-```bash
-bash tests/run-docker.sh
-```
-
-[maintenance.json](maintenance.json) records supported cores, current commands
-and explicit gaps. It is a reference map, not a passing test or a claim that
-registration/coverage totals establish completeness. Preserve ordered outputs,
-raw timestamps and the first failure. Read actual dependencies before execution.
-
-## Explicit offline integration
-
-The existing `tests/integration/run.sh` also accepts an already resolved cache
-through `ZMK_TEST_OFFLINE_WORKSPACE`, with a fresh `ZMK_TEST_OUTPUT` directory.
-Run this entry inside the same build image with the module mounted at `/src`.
-The offline path makes an isolated west workspace using the original fixture
-manifest, an unchanged local Git clone of ZMK and symlinks to cached dependencies; it never fetches or patches
-the core. Exact supported core, Zephyr and required library revisions and clean
-source state are checked before a build; existing outputs are rejected.
-The combined processors/vector runners also require
-`ZMK_TEST_OFFLINE_UPSTREAM_WORKSPACE`. Other runners select `upstream` or `dya`
-as their first argument (the inertia default remains upstream).
-
-DYA fixtures that enable custom settings require
-`ZMK_TEST_CUSTOM_SETTINGS_ARCHIVE`: the SHA256-checked git archive of the pinned
-`c6a7fef3a3be3d3ace5de9a4b0628c6418cd1f3f` test dependency, without local edits.
-The accepted archive digest is recorded in `tests/integration/offline.py`.
-All existing fixture assertions and cases run unchanged after preparation.
-Outputs inside source or dependency roots, including aliases through a parent
-symlink, are refused before creating output. Project paths must be separate
-from one another and west/config metadata so preparation cannot write through
-an existing dependency link. Sibling outputs and external dependencies remain
-supported. These admission tests run from the same host/CI entry in both modes.
-Test offline admission and rejection with
-`python3 -m unittest discover -s tests/integration -p test_offline.py -v`.
-Core updates require an explicit pin review rather than an implicit fetch.
-
-The preparation uses Linux symlinks and runs inside the documented build image.
-`ZMK_TEST_OFFLINE_NEGATIVE_CONTROL=skip-identity` in the admission test command
-intentionally bypasses dependency identity validation; its rejection tests must fail.
-`ZMK_TEST_OFFLINE_NEGATIVE_CONTROL=skip-archive-digest` bypasses only the archive
-hash check. Its parseable wrong archive must fail the missing-rejection assertion;
-an unrelated tar parsing error is not accepted as a successful control.
-
-Standalone native/kernel entries reject existing output directories and symlinks
-before invoking west or touching prior logs. The host entry also runs
-`test_output_guard.py`, which preserves a sentinel and checks zero west calls
-for existing, linked and dangling output paths.
+DYA enables custom settings; provide its unmodified git archive with revision
+and SHA256 fixed in [integration/offline.py](integration/offline.py). Keep this
+admission path: it is used by the fixture. Host/CI also run offline/output tests.
+They reject wrong/dirty/missing pins, wrong archive digest, output inside sources
+or dependencies (including parent symlinks), overlapping projects and west/config
+metadata collisions before writing. External dependencies and sibling outputs
+remain supported. Existing/linked/dangling outputs preserve sentinels and invoke
+no west command. `skip-identity` and `skip-archive-digest` negative controls must
+fail their missing-rejection assertions; tar parsing errors do not count.
 
 The chain native fixture explicitly enables module debug level 4 because its
 unchanged snapshot asserts the layer raised/dropped diagnostics. Production
@@ -153,3 +115,42 @@ ZMK_TEST_CUSTOM_SETTINGS_ARCHIVE=/resolved/custom-settings-c6a7fef.tar \
 ZMK_TEST_OUTPUT=/tmp/processors-integration-v1 \
 bash /src/tests/integration/run.sh
 ```
+
+## Retired simulation and physical gaps
+
+The two-sources simulation source and raw ordered snapshots were externally
+archived before removal. State/arithmetic/error assertions remain in the owner
+fixtures; exact radio/HID/LED/battery traces and physical USB/BLE/split delivery,
+timing, power and retention require matching production-board evidence. No failed
+snapshot was accepted. Host stubs and native snapshots do not prove transport.
+Duplicate responsibility prose is consolidated here; no current fixture,
+assertion or snapshot was removed. Empty runtime link/exclusion lists were removed
+without changing coverage selection.
+
+## Scheduled-work and settings regressions
+
+All four adapters now dispatch a changed descriptor only to its owning instance;
+initialization still applies every instance. The host bridge stand-in carries
+descriptor identity and covers foreign events and every own field. The DYA settings
+fixture uses the actual registry and worker queue: foreign-subsystem, same-subsystem
+scaler and peer-layer edits must preserve queued activation and the original idle
+deadline. Every write changes its value so notification suppression cannot hide
+this regression. Its snapshot adds the named unrelated-edit scenario; all prior lines remain.
+Direct temporary-layer API setters retain their documented reset behavior.
+
+Each adapter serializes its complete registry read/apply transaction. The real
+DYA settings fixture pauses a read in writer A, commits writer B from a higher
+priority Zephyr thread, and verifies that the older snapshot cannot win. This
+adds a second named settings scenario; all old snapshot lines remain. Linker
+wrapping controls the real registry boundary only in the owner test module.
+
+## Selected workspace and module providers
+
+Workspace selection uses tests/integration/workspace-env.sh to export the
+selected manifest's ZEPHYR_MODULES and explicit Zephyr package/base paths. A
+Zephyr symlink to a different cache must not select that cache's module providers.
+The owner test_workspace_env.py exercises actual selection with a poisoned ambient
+list, a cache symlink, module paths containing spaces, failed project discovery and
+an empty selection. The keep-ambient negative control must fail these assertions.
+Full integration retains all supported-core, role, persistence and invalid-DTS
+cases. No dependency is patched or required feature disabled.

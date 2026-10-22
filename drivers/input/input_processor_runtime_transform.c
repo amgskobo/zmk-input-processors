@@ -33,7 +33,6 @@ LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_transform, CONF
 struct runtime_transform_config {
     uint8_t type;
     size_t x_codes_len;
-    size_t y_codes_len;
     const uint16_t *x_codes;
     const uint16_t *y_codes;
     struct runtime_transform_flags defaults;
@@ -154,7 +153,6 @@ static const struct zmk_input_processor_driver_api runtime_transform_driver_api 
     static const struct runtime_transform_config runtime_transform_config_##n = {                  \
         .type = DT_INST_PROP_OR(n, type, INPUT_EV_REL),                                            \
         .x_codes_len = DT_INST_PROP_LEN(n, x_codes),                                               \
-        .y_codes_len = DT_INST_PROP_LEN(n, y_codes),                                               \
         .x_codes = runtime_transform_x_codes_##n,                                                  \
         .y_codes = runtime_transform_y_codes_##n,                                                  \
         .defaults =                                                                                \

@@ -23,8 +23,17 @@ int runtime_transform_set_flags(const struct device *dev,
 
 /* DRIVER_FUNCTIONS */
 
+static void test_foreign_events(void) {
+    const struct zmk_custom_setting foreign={true,1};
+    const zmk_event_t unrelated={1,&foreign};
+    int before=calls;
+    assert(runtime_transform_settings_event_cb(&unrelated)==ZMK_EV_EVENT_BUBBLE);
+    assert(calls==before && "foreign setting must not reapply processor");
+}
+
 int main(void) {
-    assert(runtime_transform_settings_event_cb(&changed_event) == ZMK_EV_EVENT_BUBBLE);
+    test_foreign_events();
+    assert(runtime_transform_settings_event_cb(&initialized_event) == ZMK_EV_EVENT_BUBBLE);
     assert(calls == 1 && applied.xy_swap && !applied.x_invert && applied.y_invert);
 
     struct zmk_custom_setting *flags[] = {&runtime_transform_cs_xy_swap_0,
@@ -32,10 +41,18 @@ int main(void) {
                                           &runtime_transform_cs_y_invert_0};
     for (size_t i = 0; i < 3; i++) {
         flags[i]->readable = false;
-        runtime_transform_apply_settings();
+        runtime_transform_apply_settings(NULL);
         flags[i]->readable = true;
     }
     assert(calls == 1);
+    struct zmk_custom_setting *own[]={&runtime_transform_cs_xy_swap_0,&runtime_transform_cs_x_invert_0,&runtime_transform_cs_y_invert_0};
+    int before=calls;
+    for(size_t i=0;i<sizeof(own)/sizeof(*own);i++) { own[i]->readable=true; }
+    for(size_t i=0;i<sizeof(own)/sizeof(*own);i++) {
+        const zmk_event_t changed={1,own[i]};
+        assert(runtime_transform_settings_event_cb(&changed)==ZMK_EV_EVENT_BUBBLE);
+        assert(calls==before+(int)i+1);
+    }
     puts("transform settings bridge: PASS");
     return 0;
 }

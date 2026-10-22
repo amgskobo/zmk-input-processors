@@ -582,8 +582,10 @@ are easy to get wrong:
   from storage are applied to the registry without it, so a listener on that
   event alone would never see a stored value either.
 
-Each settings file therefore subscribes to both events and re-reads every
-instance, which covers boot and every later edit. In a build without
+Each settings file therefore subscribes to both events. Initialization re-reads
+every instance; a changed-setting event applies only to the instance owning that
+descriptor. Editing another processor or subsystem cannot cancel a queued
+temporary-layer activation or extend its idle deadline. In a build without
 `CONFIG_SETTINGS` the event never fires, which is correct: nothing was stored,
 and the drivers already start from their devicetree values.
 
@@ -707,10 +709,6 @@ parameter and its optional Studio publication.
 
 Contributions are welcome! Please follow the coding patterns and conventions documented in [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
-
-## Current test entry points (2026-10-05)
-
-See [the module-owned test guide](tests/README.md). The default host command
-executes every behavior scenario once under ASan/UBSan. Set `ZMK_TEST_MODE=full`
-for all retained coverage/ABI variants. Legacy simulation has been removed
-from the active suite; its source/snapshots remain externally archived.
+Concurrent settings notifications serialize their complete read/apply transactions,
+so an older snapshot cannot overwrite a later edit. Input processing keeps its
+existing locks; the additional adapter lock is used only for settings events.

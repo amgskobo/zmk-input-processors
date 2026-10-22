@@ -72,6 +72,9 @@ fi
 # ZMK's app finds Zephyr through the CMake package registry, not ZEPHYR_BASE.
 west zephyr-export
 export ZEPHYR_BASE="$dya_dir/zephyr"
+source "/src/tests/integration/workspace-env.sh"
+zmk_test_select_workspace "$dya_dir"
+
 export ZMK_TEST_WORK_DIR="$work_dir"
 export ZMK_TEST_DYA_WORKSPACE="$dya_dir"
 export ZMK_TEST_ZMK_APP="$dya_dir/zmk/app"
