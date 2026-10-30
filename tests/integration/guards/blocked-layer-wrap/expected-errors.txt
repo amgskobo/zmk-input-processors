@@ -1,0 +1,2 @@
+# Out-of-range ID that would otherwise wrap to layer zero in uint16_t storage.
+static assertion failed: "blocked-by-layers must name existing keymap layer IDs"

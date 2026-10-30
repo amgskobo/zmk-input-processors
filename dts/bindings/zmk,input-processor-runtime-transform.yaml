@@ -20,17 +20,22 @@ properties:
     description: >-
       Event type to act on, from
       zephyr/dt-bindings/input/input-event-codes.h. The default is INPUT_EV_REL
-      (2).
+      (2). Must be 0-255, matching the input event type ABI; out-of-range
+      raw values fail the build before conversion to internal storage.
   x-codes:
     type: array
     required: true
     description: >-
       Codes travelling on the X axis. Paired with y-codes by index, which is
       how a swap knows what to exchange, so the two must be the same length.
+      Every entry must be 0-65535; invalid raw values fail the build before
+      conversion to internal storage. Both lists may be empty.
   y-codes:
     type: array
     required: true
-    description: Codes travelling on the Y axis. Same length as x-codes.
+    description: >-
+      Codes travelling on the Y axis. Same length as x-codes. Every entry
+      must be 0-65535 and is checked before conversion, including later entries.
   xy-swap:
     type: boolean
     description: >-

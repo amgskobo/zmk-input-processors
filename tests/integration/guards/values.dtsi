@@ -53,12 +53,82 @@
         map = <INPUT_REL_Y INPUT_REL_WHEEL>;
     };
 
+    xform_event_floor {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        type = <0>;
+        x-codes = <0 65535>;
+        y-codes = <65535 0>;
+    };
+    scale_event_floor {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        type = <0>;
+        codes = <0 65535>;
+        multiplier = <1>;
+        divisor = <1>;
+    };
+    map_event_floor {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        type = <0>;
+        map = <0 65535 65535 0>;
+    };
+    xform_event_ceiling {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        type = <255>;
+        x-codes = <0 65535>;
+        y-codes = <65535 0>;
+    };
+    scale_event_ceiling {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        type = <255>;
+        codes = <0 65535>;
+        multiplier = <1>;
+        divisor = <1>;
+    };
+    map_event_ceiling {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        type = <255>;
+        map = <0 65535 65535 0>;
+    };
+    xform_empty {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        x-codes = <>;
+        y-codes = <>;
+    };
+    scale_empty {
+        compatible = "zmk,input-processor-runtime-scaler";
+        #input-processor-cells = <0>;
+        codes = <>;
+        multiplier = <1>;
+        divisor = <1>;
+    };
+    map_empty {
+        compatible = "zmk,input-processor-runtime-code-mapper";
+        #input-processor-cells = <0>;
+        map = <>;
+    };
+
     layer_last {
         compatible = "zmk,input-processor-runtime-temp-layer";
         #input-processor-cells = <0>;
         layer = <1>;
         timeout-ms = <60000>;
         require-prior-idle-ms = <60000>;
+        blocked-by-layers = <0 1>;
+    };
+
+    layer_empty_blockers {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <0>;
+        timeout-ms = <0>;
+        blocked-by-layers = <>;
     };
 };
 

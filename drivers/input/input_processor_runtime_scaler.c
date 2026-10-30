@@ -6,7 +6,7 @@
  *
  * Two differences from the stock processor, and nothing else:
  *
- * 1. The arithmetic is done in int64_t, and lives in runtime_scaler_math.h so a
+ * 1. Checked 32-bit arithmetic lives in runtime_scaler_math.h so a
  *    host test can pin it. The stock scaler holds `event->value * multiplier`
  *    in an int16_t, so a multiplier of 889 turns any delta of 37 or more
  *    negative before it is divided -- the pointer reverses exactly when it is
@@ -30,7 +30,10 @@
 
 #include <zmk-input-processors/runtime_scaler.h>
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+#ifndef CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL
+#define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
+#endif
+LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_scaler, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
 
 struct runtime_scaler_config {
     uint8_t type;
@@ -90,7 +93,7 @@ int runtime_scaler_set_params(const struct device *dev, uint32_t multiplier, uin
     /* Both numbers move in one atomic word, so readers never see a mixed ratio. */
     atomic_set(&data->ratio, encode_ratio(multiplier, divisor));
 
-    LOG_DBG("%s: ratio now %u/%u", dev->name, multiplier, divisor);
+    LOG_INF("%s: ratio now %u/%u", dev->name, multiplier, divisor);
 
     return 0;
 }
@@ -101,8 +104,6 @@ static int scale_value(struct input_event *event, uint32_t multiplier, uint32_t 
 
     event->value = runtime_scaler_scale(original, multiplier, divisor,
                                         state != NULL ? state->remainder : NULL);
-
-    LOG_DBG("scaled %d by %u/%u to %d", original, multiplier, divisor, event->value);
 
     return ZMK_INPUT_PROC_CONTINUE;
 }
@@ -148,7 +149,16 @@ static const struct zmk_input_processor_driver_api runtime_scaler_driver_api = {
     .handle_event = runtime_scaler_handle_event,
 };
 
+#define RUNTIME_SCALER_ASSERT_CODE(idx, n)                                                        \
+    BUILD_ASSERT(DT_INST_PROP_BY_IDX(n, codes, idx) >= 0 &&                                      \
+                     DT_INST_PROP_BY_IDX(n, codes, idx) <= UINT16_MAX,                           \
+                 "codes entries must be 0-65535");
+
 #define RUNTIME_SCALER_INST(n)                                                                     \
+    BUILD_ASSERT(DT_INST_PROP_OR(n, type, INPUT_EV_REL) >= 0 &&                                 \
+                     DT_INST_PROP_OR(n, type, INPUT_EV_REL) <= UINT8_MAX,                        \
+                 "type must be 0-255");                                                          \
+    LISTIFY(DT_INST_PROP_LEN(n, codes), RUNTIME_SCALER_ASSERT_CODE, (), n)                        \
     BUILD_ASSERT(                                                                                  \
         RUNTIME_SCALER_DT_PARAMS_VALID(DT_INST_PROP(n, multiplier), DT_INST_PROP(n, divisor)),     \
         "multiplier must be 0-32767 and divisor 1-32767");                                         \

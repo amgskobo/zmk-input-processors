@@ -9,14 +9,14 @@
  * scroll route back into a pointer route, which is the reason the mapper is
  * worth having a runtime form at all.
  *
- * This file owns persistence. The driver deliberately stores nothing, so
- * there is one owner for the value and no way for the two to disagree after a
- * reboot.
+ * This adapter publishes settings and applies coherent live snapshots.
+ * The custom-settings registry owns persistence; the driver owns live state.
  */
 
 #define DT_DRV_COMPAT zmk_input_processor_runtime_code_mapper
 
 #include <zephyr/devicetree.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
 #include <cormoran/zmk/custom_settings.h>
@@ -25,7 +25,14 @@
 #include <zmk-input-processors/custom_settings.h>
 #include <zmk-input-processors/runtime_code_mapper.h>
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+#include "input_processors_custom_settings.h"
+
+#ifndef CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL
+#define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
+#endif
+LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_code_mapper_custom_settings, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
+
+static K_MUTEX_DEFINE(settings_lock);
 
 /*
  * The devicetree property is start-disabled rather than enabled because a
@@ -44,29 +51,25 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 DT_INST_FOREACH_STATUS_OKAY(RUNTIME_CODE_MAPPER_SETTINGS)
 
 #define RUNTIME_CODE_MAPPER_APPLY(n)                                                               \
-    {                                                                                              \
-        struct zmk_custom_setting_value value;                                                     \
-                                                                                                   \
-        if (zmk_custom_setting_read(&runtime_code_mapper_cs_enabled_##n, &value) == 0 &&           \
-            value.type == ZMK_CUSTOM_SETTING_VALUE_TYPE_BOOL) {                                    \
-            (void)runtime_code_mapper_set_enabled(DEVICE_DT_INST_GET(n), value.bool_value);        \
+    if (changed_setting == NULL || \
+        changed_setting == &runtime_code_mapper_cs_enabled_##n) { \
+        bool enabled;                                                                              \
+        if (input_processors_read_bool(&runtime_code_mapper_cs_enabled_##n, &enabled)) {           \
+            (void)runtime_code_mapper_set_enabled(DEVICE_DT_INST_GET(n), enabled);                 \
         }                                                                                          \
     }
 
-static void runtime_code_mapper_apply_settings(void) {
+static void runtime_code_mapper_apply_settings(const struct zmk_custom_setting *changed_setting) {
+    /* Concurrent notifications must not apply an older snapshot last. */
+    k_mutex_lock(&settings_lock, K_FOREVER);
     DT_INST_FOREACH_STATUS_OKAY(RUNTIME_CODE_MAPPER_APPLY)
+    k_mutex_unlock(&settings_lock);
 }
 
 static int runtime_code_mapper_settings_event_cb(const zmk_event_t *eh) {
-    ARG_UNUSED(eh);
-
-    /*
-     * Both subscribed events mean the same thing here -- some stored value may
-     * now differ from what the processor is running -- and re-reading every
-     * instance is cheaper than working out which one moved.
-     */
-    runtime_code_mapper_apply_settings();
-
+    const struct zmk_custom_setting_changed *changed = as_zmk_custom_setting_changed(eh);
+    /* Boot loads every node. An edit must not reset another node's live state. */
+    runtime_code_mapper_apply_settings(changed == NULL ? NULL : changed->setting);
     return ZMK_EV_EVENT_BUBBLE;
 }
 

@@ -18,17 +18,18 @@ static inline bool runtime_temp_layer_values_valid(uint32_t layer, uint32_t time
 }
 
 /* A press at t blocks activation for [t, t + require_prior_idle_ms); zero turns it off. */
-static inline bool runtime_temp_layer_is_typing(int64_t last_tapped, uint16_t require_prior_idle_ms,
-                                                int64_t now) {
+static inline bool runtime_temp_layer_is_typing(uint32_t last_tapped, uint16_t require_prior_idle_ms,
+                                                uint32_t now) {
     if (require_prior_idle_ms == 0) {
         return false;
     }
 
-    if (now < last_tapped) {
+    const uint32_t elapsed = now - last_tapped;
+    /* Half-range ordering treats a short backwards clock as a future press.
+     * Callers use modulo-32-bit uptime; longer silent spans are ambiguous. */
+    if (elapsed > INT32_MAX) {
         return true;
     }
-
-    const uint64_t elapsed = (uint64_t)now - (uint64_t)last_tapped;
 
     return elapsed < require_prior_idle_ms;
 }

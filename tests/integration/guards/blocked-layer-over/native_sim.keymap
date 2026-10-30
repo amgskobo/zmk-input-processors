@@ -1,0 +1,14 @@
+/* Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT */
+#include "../values.dtsi"
+
+/ {
+    blocked_layer_over {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <1>;
+        timeout-ms = <1>;
+        /* The second element must be checked, too. Valid IDs are 0 and 1. */
+        blocked-by-layers = <0 2>;
+    };
+};

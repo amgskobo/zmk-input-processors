@@ -25,7 +25,10 @@
 #include <zmk-input-processors/runtime_code_mapper.h>
 #include <zmk-input-processors/runtime_code_mapper_math.h>
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+#ifndef CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL
+#define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
+#endif
+LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_code_mapper, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
 
 struct runtime_code_mapper_config {
     uint8_t type;
@@ -67,7 +70,7 @@ int runtime_code_mapper_set_enabled(const struct device *dev, bool enabled) {
 
     atomic_set(&data->enabled, enabled ? 1 : 0);
 
-    LOG_DBG("%s: map %s", dev->name, enabled ? "on" : "off");
+    LOG_INF("%s: map %s", dev->name, enabled ? "on" : "off");
 
     return 0;
 }
@@ -87,11 +90,7 @@ static int runtime_code_mapper_handle_event(const struct device *dev, struct inp
         return ZMK_INPUT_PROC_CONTINUE;
     }
 
-    const uint16_t original = event->code;
     runtime_code_mapper_apply(&event->code, config->map, config->pairs, true);
-    if (event->code != original) {
-        LOG_DBG("Remapped %d to %d", original, event->code);
-    }
 
     return ZMK_INPUT_PROC_CONTINUE;
 }
@@ -109,7 +108,16 @@ static const struct zmk_input_processor_driver_api runtime_code_mapper_driver_ap
     .handle_event = runtime_code_mapper_handle_event,
 };
 
+#define RUNTIME_CODE_MAPPER_ASSERT_CODE(idx, n)                                                   \
+    BUILD_ASSERT(DT_INST_PROP_BY_IDX(n, map, idx) >= 0 &&                                        \
+                     DT_INST_PROP_BY_IDX(n, map, idx) <= UINT16_MAX,                             \
+                 "map entries must be 0-65535");
+
 #define RUNTIME_CODE_MAPPER_INST(n)                                                                \
+    BUILD_ASSERT(DT_INST_PROP_OR(n, type, INPUT_EV_REL) >= 0 &&                                 \
+                     DT_INST_PROP_OR(n, type, INPUT_EV_REL) <= UINT8_MAX,                        \
+                 "type must be 0-255");                                                          \
+    LISTIFY(DT_INST_PROP_LEN(n, map), RUNTIME_CODE_MAPPER_ASSERT_CODE, (), n)                      \
     BUILD_ASSERT(DT_INST_PROP_LEN(n, map) % 2 == 0,                                                \
                  "map is a list of from/to pairs, so it needs an even number of entries");         \
     static const uint16_t runtime_code_mapper_map_##n[] = DT_INST_PROP(n, map);                    \

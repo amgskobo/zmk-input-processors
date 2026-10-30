@@ -1,0 +1,14 @@
+/* Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT */
+#include "../values.dtsi"
+
+/ {
+    blocked_layer_wrap {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <1>;
+        timeout-ms = <1>;
+        /* This used to narrow to valid-looking layer zero before init. */
+        blocked-by-layers = <65536>;
+    };
+};

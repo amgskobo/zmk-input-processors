@@ -1,0 +1,10 @@
+/* SPDX-License-Identifier: MIT */
+#include "../values.dtsi"
+/ {
+    raw_y {
+        compatible = "zmk,input-processor-runtime-transform";
+        #input-processor-cells = <0>;
+        x-codes = <3 4 5>;
+        y-codes = <65536 1 2>;
+    };
+};

@@ -49,8 +49,12 @@
 
 #include <zmk-input-processors/runtime_temp_layer.h>
 #include <zmk-input-processors/runtime_temp_layer_policy.h>
+#include "runtime_temp_layer_timeout.h"
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+#ifndef CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL
+#define CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL 3
+#endif
+LOG_MODULE_REGISTER(zmk_input_processors_input_processor_runtime_temp_layer, CONFIG_ZMK_INPUT_PROCESSORS_LOG_LEVEL);
 
 struct runtime_temp_layer_config {
     const uint16_t *excluded_positions;
@@ -75,17 +79,24 @@ struct runtime_temp_layer_data {
     atomic_t generation;
     /* The layer actually raised, which params.layer may have moved past. */
     uint8_t active_layer;
-    int64_t last_tapped;
+    uint32_t last_tapped;
     /* Absolute deadline lets a running stale timeout recognize a newer one. */
-    int64_t deactivate_at;
+    uint32_t deactivate_at;
+    bool timeout_pending;
     bool force_deactivate;
 
     struct k_work activate_work;
     struct k_work_delayable deactivate_work;
 };
 
+/* Layer changes synchronously notify every instance. Serialize transitions
+ * before taking an instance lock: otherwise activation on the worker can hold
+ * A while a position callback holds B, and both notifications wait for the
+ * other instance. Ordinary parameter/read/input paths keep their local locks. */
+static K_MUTEX_DEFINE(runtime_temp_layer_transition_lock);
+
 /*
- * Caller holds the lock.
+ * Caller holds the transition lock, then this instance's lock.
  *
  * is_active is written before the call and corrected after it, and both halves
  * matter.
@@ -135,12 +146,16 @@ static void activate_work_cb(struct k_work *work) {
         CONTAINER_OF(work, struct runtime_temp_layer_data, activate_work);
     const struct runtime_temp_layer_config *config = data->dev->config;
 
+    if (k_mutex_lock(&runtime_temp_layer_transition_lock, K_FOREVER) < 0) {
+        return;
+    }
     if (k_mutex_lock(&data->lock, K_FOREVER) < 0) {
+        k_mutex_unlock(&runtime_temp_layer_transition_lock);
         return;
     }
 
     const bool typing = runtime_temp_layer_is_typing(
-        data->last_tapped, data->params.require_prior_idle_ms, k_uptime_get());
+        data->last_tapped, data->params.require_prior_idle_ms, k_uptime_get_32());
 
     const atomic_val_t generation = data->pending_generation;
 
@@ -167,6 +182,7 @@ static void activate_work_cb(struct k_work *work) {
     data->activation_pending = false;
 
     k_mutex_unlock(&data->lock);
+    k_mutex_unlock(&runtime_temp_layer_transition_lock);
 }
 
 static void deactivate_work_cb(struct k_work *work) {
@@ -174,28 +190,37 @@ static void deactivate_work_cb(struct k_work *work) {
     struct runtime_temp_layer_data *data =
         CONTAINER_OF(delayable, struct runtime_temp_layer_data, deactivate_work);
 
+    if (k_mutex_lock(&runtime_temp_layer_transition_lock, K_FOREVER) < 0) {
+        return;
+    }
     if (k_mutex_lock(&data->lock, K_FOREVER) < 0) {
+        k_mutex_unlock(&runtime_temp_layer_transition_lock);
         return;
     }
 
     if (data->force_deactivate) {
         data->force_deactivate = false;
         data->deactivate_at = 0;
+        data->timeout_pending = false;
         set_layer_locked(data, false);
     } else if (data->params.enabled && data->is_active && data->params.timeout_ms > 0 &&
-               data->deactivate_at > 0) {
-        const int64_t remaining = data->deactivate_at - k_uptime_get();
+               data->timeout_pending) {
+        const uint32_t remaining = data->deactivate_at - k_uptime_get_32();
 
-        if (remaining > 0) {
+        if (remaining != 0U && remaining < 0x80000000U) {
             k_work_reschedule_for_queue(zmk_workqueue_lowprio_work_q(),
-                                        &data->deactivate_work, K_MSEC(remaining));
+                                        &data->deactivate_work,
+                                        K_TICKS(runtime_temp_layer_timeout_ticks(
+                                            remaining, CONFIG_SYS_CLOCK_TICKS_PER_SEC)));
         } else {
             data->deactivate_at = 0;
+            data->timeout_pending = false;
             set_layer_locked(data, false);
         }
     }
 
     k_mutex_unlock(&data->lock);
+    k_mutex_unlock(&runtime_temp_layer_transition_lock);
 }
 
 static bool runtime_temp_layer_device_valid(const struct device *dev);
@@ -267,9 +292,11 @@ int runtime_temp_layer_set_params(const struct device *dev,
 
     data->force_deactivate = release_held_layer;
     if (restart_timeout) {
-        data->deactivate_at = k_uptime_get() + params->timeout_ms;
+        data->deactivate_at = k_uptime_get_32() + params->timeout_ms;
+        data->timeout_pending = true;
     } else {
         data->deactivate_at = 0;
+        data->timeout_pending = false;
     }
 
     if (release_held_layer) {
@@ -277,7 +304,8 @@ int runtime_temp_layer_set_params(const struct device *dev,
                                     K_NO_WAIT);
     } else if (restart_timeout) {
         k_work_reschedule_for_queue(zmk_workqueue_lowprio_work_q(), &data->deactivate_work,
-                                    K_MSEC(params->timeout_ms));
+                                    K_TICKS(runtime_temp_layer_timeout_ticks(
+                                        params->timeout_ms, CONFIG_SYS_CLOCK_TICKS_PER_SEC)));
     } else {
         k_work_cancel_delayable(&data->deactivate_work);
     }
@@ -316,6 +344,7 @@ static int handle_layer_state_changed(const struct device *dev) {
     if (data->is_active && !zmk_keymap_layer_active(data->active_layer)) {
         data->is_active = false;
         data->deactivate_at = 0;
+        data->timeout_pending = false;
         data->force_deactivate = false;
         k_work_cancel_delayable(&data->deactivate_work);
     }
@@ -334,16 +363,21 @@ static int handle_position_state_changed(const struct device *dev,
         return ZMK_EV_EVENT_BUBBLE;
     }
 
+    if (k_mutex_lock(&runtime_temp_layer_transition_lock, K_FOREVER) < 0) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
     if (k_mutex_lock(&data->lock, K_FOREVER) < 0) {
+        k_mutex_unlock(&runtime_temp_layer_transition_lock);
         return ZMK_EV_EVENT_BUBBLE;
     }
 
     const bool excluded = position_is_excluded(config, ev->position);
 
-    if (runtime_temp_layer_should_drop_for_position(data->is_active, ev->state,
-                                                    config->num_positions > 0, excluded)) {
+    /* Only instances with an exclusion list get this far: see the return above. */
+    if (runtime_temp_layer_should_drop_for_position(data->is_active, ev->state, true, excluded)) {
         set_layer_locked(data, false);
         data->deactivate_at = 0;
+        data->timeout_pending = false;
         data->force_deactivate = false;
         k_work_cancel_delayable(&data->deactivate_work);
     } else if (!excluded) {
@@ -352,6 +386,7 @@ static int handle_position_state_changed(const struct device *dev,
     }
 
     k_mutex_unlock(&data->lock);
+    k_mutex_unlock(&runtime_temp_layer_transition_lock);
 
     return ZMK_EV_EVENT_BUBBLE;
 }
@@ -368,7 +403,7 @@ static int handle_keycode_state_changed(const struct device *dev,
         return ZMK_EV_EVENT_BUBBLE;
     }
 
-    data->last_tapped = ev->timestamp;
+    data->last_tapped = (uint32_t)ev->timestamp;
     /* The queued activation rechecks typing, but clearing this also covers a
      * zero idle guard and preserves event order. */
     data->activation_pending = false;
@@ -455,7 +490,7 @@ static int runtime_temp_layer_handle_event(const struct device *dev, struct inpu
     }
 
     const bool typing = runtime_temp_layer_is_typing(data->last_tapped,
-                                                     params.require_prior_idle_ms, k_uptime_get());
+                                                     params.require_prior_idle_ms, k_uptime_get_32());
 
     if (runtime_temp_layer_should_activate(params.enabled, data->is_active, typing)) {
         data->pending_layer = params.layer;
@@ -465,10 +500,12 @@ static int runtime_temp_layer_handle_event(const struct device *dev, struct inpu
     }
 
     if (runtime_temp_layer_should_schedule_timeout(&params)) {
-        data->deactivate_at = k_uptime_get() + params.timeout_ms;
+        data->deactivate_at = k_uptime_get_32() + params.timeout_ms;
+        data->timeout_pending = true;
         data->force_deactivate = false;
         k_work_reschedule_for_queue(zmk_workqueue_lowprio_work_q(), &data->deactivate_work,
-                                    K_MSEC(params.timeout_ms));
+                                    K_TICKS(runtime_temp_layer_timeout_ticks(
+                                        params.timeout_ms, CONFIG_SYS_CLOCK_TICKS_PER_SEC)));
     }
 
     k_mutex_unlock(&data->lock);
@@ -501,7 +538,14 @@ static const struct zmk_input_processor_driver_api runtime_temp_layer_driver_api
     .handle_event = runtime_temp_layer_handle_event,
 };
 
+#define RUNTIME_TEMP_LAYER_ASSERT_BLOCKER(idx, n)                                                 \
+    BUILD_ASSERT(DT_INST_PROP_BY_IDX(n, blocked_by_layers, idx) >= 0 &&                           \
+                     DT_INST_PROP_BY_IDX(n, blocked_by_layers, idx) < ZMK_KEYMAP_LAYERS_LEN,     \
+                 "blocked-by-layers must name existing keymap layer IDs");
+
 #define RUNTIME_TEMP_LAYER_INST(n)                                                                 \
+    LISTIFY(DT_INST_PROP_LEN_OR(n, blocked_by_layers, 0), RUNTIME_TEMP_LAYER_ASSERT_BLOCKER, (),  \
+            n)                                                                                    \
     BUILD_ASSERT(DT_INST_PROP(n, layer) >= 0 && DT_INST_PROP(n, layer) < ZMK_KEYMAP_LAYERS_LEN,    \
                  "layer must name a layer this keymap has");                                       \
     BUILD_ASSERT(DT_INST_PROP(n, timeout_ms) >= 0 &&                                               \

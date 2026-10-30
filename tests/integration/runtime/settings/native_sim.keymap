@@ -80,6 +80,13 @@
         excluded-positions = <1>;
     };
 
+    rt_layer_peer: rt_layer_peer {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <2>;
+        timeout-ms = <200>;
+    };
+
     rt_twin {
         compatible = "zmk,input-processor-runtime-scaler";
         #input-processor-cells = <0>;

@@ -1,0 +1,13 @@
+/* Copyright (c) 2026 amgskobo
+ * SPDX-License-Identifier: MIT */
+#include "../values.dtsi"
+
+/ {
+    blocked_layer_negative {
+        compatible = "zmk,input-processor-runtime-temp-layer";
+        #input-processor-cells = <0>;
+        layer = <1>;
+        timeout-ms = <1>;
+        blocked-by-layers = <(-1) 0>;
+    };
+};

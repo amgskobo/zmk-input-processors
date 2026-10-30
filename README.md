@@ -27,7 +27,7 @@ Originals live elsewhere, one module each —
 
 ## Features
 
-- **Runtime Scaler** — Scales pointer events by a ratio held on the node, in 64-bit arithmetic
+- **Runtime Scaler** — Scales pointer events by a ratio held on the node, using checked 32-bit arithmetic
 - **Runtime Transform** — Swaps and inverts axes from three flags held on the node
 - **Runtime Code Mapper** — Rewrites event codes, with a switch that turns the map off
 - **Runtime Temp Layer** — Raises a layer while a pointer is in use, on a layer and timers held on the node
@@ -99,6 +99,17 @@ to them:
 
 Boards override the destination layer and excluded physical positions on the
 temp-layer node when needed.
+
+### Event type and code bounds
+
+The scaler, transform and code mapper accept the full Zephyr input-event ABI:
+`type` is 0 through 255, and every `codes`, `x-codes`, `y-codes` or `map` entry
+is 0 through 65535. Every original devicetree element is checked before it is
+stored; negative and overflowing values fail the build with a property-specific
+message instead of aliasing a different event. The first, second and last list
+entries are checked equally. Omitting `type` still selects `INPUT_EV_REL` (2).
+Empty code lists remain valid; transform lists still need equal lengths and a
+map still needs complete from/to pairs.
 
 ## Naming
 
@@ -235,13 +246,16 @@ doing nothing.
 `zmk,input-processor-runtime-scaler` scales relative pointer events, like ZMK's
 own `zmk,input-processor-scaler`. It differs in two ways.
 
-**The arithmetic is done in 64 bits.** The stock scaler holds
-`event->value * multiplier` in an `int16_t`, so with a multiplier of 889 any
-delta of 37 or more wraps negative before it is divided, and the pointer jumps
-backwards exactly when it is moving fastest. A runtime scaler that copies the
-expression inherits the same reversal. Here the numerator and quotient are `int64_t`
-and an out-of-range quotient saturates instead of wrapping, so a fast movement
-stays a fast movement.
+**The arithmetic uses checked 32-bit operations.** The stock scaler narrows
+the product to `int16_t`, so 37 multiplied by 889 reverses sign before division.
+This scaler checks the product and carried fraction before using the ordinary
+32-bit divider. Larger inputs are split into whole and fractional parts before
+multiplication; this preserves the full input range, signed truncation and
+tracked remainder without wide arithmetic. Out-of-range results saturate.
+
+Ratios `1/1` and `0/1` clear any old listener fraction and return the
+input or zero without multiplication or division. Other ratios retain their
+signed fraction, saturation and runtime-update behavior.
 
 **The ratio is a property, not a pair of chain cells.** That is what makes it
 addressable: a chain cell can only be identified as "the second number in the
@@ -407,7 +421,9 @@ events arriving before the queue runs leave the first layer active and the
 second unraised. The source using the unraised layer can take its listener's
 opposite-pointer scroll route. The property is structural; if a Studio edit
 changes either instance's target layer ID, update the blockers in devicetree
-as well. An out-of-range blocker prevents the processor device from starting.
+as well. Every blocker must name an existing keymap layer ID. Invalid values
+are rejected at build time, before conversion to the internal 16-bit list.
+An absent or empty list leaves activation unrestricted.
 
 `layer` is published with the `LAYER_ID` constraint, so a client draws the
 keymap's own layer list and the row reads "MOUSE (3)" rather than "3" — a
@@ -437,6 +453,16 @@ updates also advance a generation counter before waiting for the worker lock;
 the worker checks it before and after activation and immediately undoes an
 activation if an edit arrived while layer events were being dispatched.
 
+Layer transitions take a module-wide transition mutex before an instance's
+mutex. ZMK synchronously notifies all instances during a layer change, so
+independent instances must use that order even when activation runs on the
+worker and a position-triggered drop runs on the input thread. This prevents
+the two callbacks from holding A and B while each waits for the other. A
+position-triggered drop still completes synchronously before the callback
+returns. Ordinary reads, parameter updates and input admission keep their
+instance-local locks. The [focused kernel regression](tests/transition-lock/README.md)
+pins the concurrent transition and unchanged layer ownership.
+
 `excluded-positions` stays structural. A list of key positions is not something
 a generic settings list can draw, and it belongs to the physical layout rather
 than to taste. Omitting the property disables position-based dropping entirely,
@@ -446,6 +472,12 @@ Changing the timeout while the layer is raised restarts it from the setting
 update. Setting it to zero cancels the pending timeout. Any activation queued
 before a parameter update is discarded, so an event observed under old
 parameters cannot raise either the old or the new layer afterwards.
+
+Layer clocks use `uint32_t` milliseconds and explicit pending-deadline
+state, so a deadline of zero after wrap is valid. Deadline ordering assumes
+elapsed observations below 2^31 ms; long silent spans can be ambiguous. The
+typing guard conservatively suppresses activation for a key timestamp
+interpreted as future.
 
 Three things differ from upstream beyond the parameters:
 
@@ -572,14 +604,20 @@ are easy to get wrong:
   from storage are applied to the registry without it, so a listener on that
   event alone would never see a stored value either.
 
-Each settings file therefore subscribes to both events and re-reads every
-instance, which covers boot and every later edit. In a build without
+Each settings file therefore subscribes to both events. Initialization re-reads
+every instance; a changed-setting event applies only to the instance owning that
+descriptor. Editing another processor or subsystem cannot cancel a queued
+temporary-layer activation or extend its idle deadline. In a build without
 `CONFIG_SETTINGS` the event never fires, which is correct: nothing was stored,
 and the drivers already start from their devicetree values.
 
-The option needs `zmk-feature-custom-settings`, and so the patched ZMK that
+The option needs [`zmk-feature-custom-settings`](https://github.com/cormoran/zmk-feature-custom-settings), and so the patched ZMK that
 carries the custom Studio RPC protocol. Processors can also be driven from C
 directly — see `include/zmk-input-processors/runtime_scaler.h`.
+
+Concurrent settings notifications serialize their complete read/apply transactions,
+so an older snapshot cannot overwrite a later edit. Input processing keeps its
+existing locks; the additional adapter lock is used only for settings events.
 
 ## Project Structure
 
@@ -627,21 +665,24 @@ builds, with the source tree mounted read-only:
 
 ```bash
 bash ./tests/run-docker.sh
+ZMK_TEST_MODE=full bash ./tests/run-docker.sh
 bash ./tests/run-integration-docker.sh
 ```
 
-`run-docker.sh` runs the contract tests in `tests/unit/`, one program for each
-header of dependency-free logic the drivers call. Each is built three ways --
-optimised, under AddressSanitizer and UndefinedBehaviorSanitizer, and as a
-32-bit program like the firmware it models -- and the headers also have to
-compile on their own, free of Zephyr, under `-Wconversion`. The scaler is
-checked against values pinned from the hardware session that found the
-reversal, a reference model, a million random cases, and the invariant that no
-movement is lost or invented. The transform, the code map and the temp-layer
-policy are checked across their whole input domains.
+The default `quick` host mode runs every behavioral scenario under ASan/UBSan,
+including the dependency-free unit headers and production driver/settings
+fixtures. The headers must also compile independently of Zephyr under
+`-Wconversion`; infrastructure and admission checks run in both modes.
+
+`ZMK_TEST_MODE=full` retains those scenarios and adds the optimized, measured
+coverage and existing 32-bit variants. Complete function/line/branch gates remain
+required in full mode; quick is not a coverage result. See the current
+[owner test guide](tests/README.md) for the fixture map, role/kernel checks,
+fresh-output commands and explicit physical acceptance gaps. Devicetree
+instantiation and listener registration remain integration checks.
 
 `run-integration-docker.sh` fetches the DYA ZMK fork with
-`zmk-feature-custom-settings`, and upstream ZMK without it -- and no keyboard
+[`zmk-feature-custom-settings`](https://github.com/cormoran/zmk-feature-custom-settings), and upstream ZMK without it -- and no keyboard
 configuration or other input-processor module -- and runs four suites:
 
 | Suite | What it proves |
@@ -649,7 +690,7 @@ configuration or other input-processor module -- and runs four suites:
 | `firmware` | A shield with one instance of every processor builds for a real board, with every settings key in the image; and both halves of a split keyboard sharing one devicetree build, the central half with its settings and the peripheral half without settings or the central-only temp layer. |
 | `guards` | Devicetree past each documented limit is refused at build time with its own message, and devicetree exactly at the limit builds. |
 | `runtime` | On native_sim, compared with snapshots: every driver's API, event filtering and temp-layer timing against ZMK's own keymap; every published setting's type, default and range, the Studio subsystem they are published under, writes reaching the drivers, stored values applied again after a reboot, and duplicate keys reported at boot; a listener chain producing the HID reports worked out by hand; and the ready-made nodes in `input_processor_runtime.dtsi` starting at the defaults documented above. |
-| `upstream` | The runtime cases that need no custom settings, built and run against upstream ZMK with `zmk-feature-custom-settings` absent, as the introduction says they can be. |
+| `upstream` | The runtime cases that need no custom settings, built and run against upstream ZMK with [`zmk-feature-custom-settings`](https://github.com/cormoran/zmk-feature-custom-settings) absent, as the introduction says they can be. |
 
 Name suites to run a subset. A Docker volume keeps the ZMK workspaces between
 runs, which turns each fetch into an update:
