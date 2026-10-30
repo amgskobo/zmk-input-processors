@@ -583,7 +583,7 @@ subsystem の編集で、待機中のレイヤー有効化を中止したり、�
 ビルドではこの event は発生しませんが、それで正しい動作です。何も保存されておらず、
 driver はすでに devicetree の値で動いているからです。
 
-この option には `zmk-feature-custom-settings` が必要であり、したがって custom
+この option には [`zmk-feature-custom-settings`](https://github.com/cormoran/zmk-feature-custom-settings) が必要であり、したがって custom
 Studio RPC protocol を持つ ZMK が必要です。processor は C から直接操作することも
 できます。`include/zmk-input-processors/runtime_scaler.h` を参照してください。
 
@@ -651,7 +651,7 @@ fixture の対応、role と kernel の検査、新しい出力先を使うコ�
 [owner のテストガイド](tests/README.md)を参照してください。devicetree からの instance
 生成と listener 登録そのものは統合テストで確認します。
 
-`run-integration-docker.sh` は、`zmk-feature-custom-settings` を含む DYA ZMK fork と、
+`run-integration-docker.sh` は、[`zmk-feature-custom-settings`](https://github.com/cormoran/zmk-feature-custom-settings) を含む DYA ZMK fork と、
 それを含まない upstream ZMK を取得し(キーボード設定や他の input processor module は
 含みません)、4 つの suite を実行します。
 
@@ -660,7 +660,7 @@ fixture の対応、role と kernel の検査、新しい出力先を使うコ�
 | `firmware` | すべての processor を 1 つずつ持つ shield が実機 board 向けにビルドでき、すべての設定キーが image に含まれること。1 つの devicetree を共有する split キーボードの両半分がビルドでき、central 側は設定付き、peripheral 側は設定と central 専用の temp layer なしでビルドされること。 |
 | `guards` | 文書化した各上限を超える devicetree がそれぞれ専用のメッセージでビルド時に拒否され、上限ちょうどの devicetree はビルドできること。 |
 | `runtime` | native_sim 上で snapshot と比較し、各 driver の API、event の絞り込み、ZMK 自身の keymap に対する temp-layer のタイミングと 2 つの pointer 間のレイヤー競合、公開する各設定の型・既定値・範囲、公開先の Studio subsystem、driver への書き込みの反映、再起動後の保存値の再適用、起動時の重複キー報告、手計算した HID report を生成する listener chain、`input_processor_runtime.dtsi` の既定 node が上記の既定値で始まることを確認します。 |
-| `upstream` | custom settings を必要としない runtime ケースを、`zmk-feature-custom-settings` のない upstream ZMK でビルド・実行し、冒頭の説明どおり動作することを確認します。 |
+| `upstream` | custom settings を必要としない runtime ケースを、[`zmk-feature-custom-settings`](https://github.com/cormoran/zmk-feature-custom-settings) のない upstream ZMK でビルド・実行し、冒頭の説明どおり動作することを確認します。 |
 
 suite 名を指定すると一部だけ実行できます。Docker volume を使うと ZMK の workspace が
 実行間で保持され、取得が更新だけになります。

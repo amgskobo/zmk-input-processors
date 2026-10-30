@@ -37,8 +37,7 @@ when enabled; retain the upstream and negative-guard fixture contracts.
 Hardware-independent host/protocol and native/compile checks may run
 independently. Host mocks do not prove real scheduling, electrical timing or
 radio delivery; require focused kernel/driver tests or actual physical checks
-for those claims. The unfinished custom shared-XIAO checkout was retired from
-the active workspace; it is not a prerequisite for these owner tests. Legacy
+for those claims. Legacy
 radio diagnostics have been removed from the active test tree and archived.
 If a simulator is introduced later, independently validate each exercised
 production path and correlate hardware before claiming fidelity. Do not disable
@@ -66,8 +65,7 @@ settings transitions; totals are supplemental. Preserve raw simulated time.
 Exact traces are valid for fixed-input regressions; variable-timing tests need
 explicit bounds. Repeat identical binary/seed/input/PHY/initial-flash runs
 before classifying differences; never erase timestamps to hide a failure.
-Record the backend and driver substitutions: existing bsim suites do not
-certify the new shared XIAO board. Run `git diff --check`; do not regenerate
+Record the backend and driver substitutions: simulation results do not establish production-board acceptance. Run `git diff --check`; do not regenerate
 snapshots without an explained change.
 
 ## Small module-owned checks (2026-10-05)
@@ -142,7 +140,6 @@ Read `tests/maintenance.json` for current coverage/compatibility boundaries.
 
 ## No rolling task backups
 
-Do not create or use `C:/zbm-backups`. The user abolished that location.
 Keep executable tests in this owner's `tests/`. Use temporary build storage
 and fresh meaningful result artifacts; preserve necessary review diffs, source
 identities and raw failure logs without rolling whole-tree source backups.

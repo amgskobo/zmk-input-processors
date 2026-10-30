@@ -611,7 +611,7 @@ temporary-layer activation or extend its idle deadline. In a build without
 `CONFIG_SETTINGS` the event never fires, which is correct: nothing was stored,
 and the drivers already start from their devicetree values.
 
-The option needs `zmk-feature-custom-settings`, and so the patched ZMK that
+The option needs [`zmk-feature-custom-settings`](https://github.com/cormoran/zmk-feature-custom-settings), and so the patched ZMK that
 carries the custom Studio RPC protocol. Processors can also be driven from C
 directly — see `include/zmk-input-processors/runtime_scaler.h`.
 
@@ -682,7 +682,7 @@ fresh-output commands and explicit physical acceptance gaps. Devicetree
 instantiation and listener registration remain integration checks.
 
 `run-integration-docker.sh` fetches the DYA ZMK fork with
-`zmk-feature-custom-settings`, and upstream ZMK without it -- and no keyboard
+[`zmk-feature-custom-settings`](https://github.com/cormoran/zmk-feature-custom-settings), and upstream ZMK without it -- and no keyboard
 configuration or other input-processor module -- and runs four suites:
 
 | Suite | What it proves |
@@ -690,7 +690,7 @@ configuration or other input-processor module -- and runs four suites:
 | `firmware` | A shield with one instance of every processor builds for a real board, with every settings key in the image; and both halves of a split keyboard sharing one devicetree build, the central half with its settings and the peripheral half without settings or the central-only temp layer. |
 | `guards` | Devicetree past each documented limit is refused at build time with its own message, and devicetree exactly at the limit builds. |
 | `runtime` | On native_sim, compared with snapshots: every driver's API, event filtering and temp-layer timing against ZMK's own keymap; every published setting's type, default and range, the Studio subsystem they are published under, writes reaching the drivers, stored values applied again after a reboot, and duplicate keys reported at boot; a listener chain producing the HID reports worked out by hand; and the ready-made nodes in `input_processor_runtime.dtsi` starting at the defaults documented above. |
-| `upstream` | The runtime cases that need no custom settings, built and run against upstream ZMK with `zmk-feature-custom-settings` absent, as the introduction says they can be. |
+| `upstream` | The runtime cases that need no custom settings, built and run against upstream ZMK with [`zmk-feature-custom-settings`](https://github.com/cormoran/zmk-feature-custom-settings) absent, as the introduction says they can be. |
 
 Name suites to run a subset. A Docker volume keeps the ZMK workspaces between
 runs, which turns each fetch into an update:
