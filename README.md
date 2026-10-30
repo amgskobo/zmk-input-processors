@@ -27,7 +27,7 @@ Originals live elsewhere, one module each —
 
 ## Features
 
-- **Runtime Scaler** — Scales pointer events by a ratio held on the node, in 64-bit arithmetic
+- **Runtime Scaler** — Scales pointer events by a ratio held on the node, using checked 32-bit arithmetic
 - **Runtime Transform** — Swaps and inverts axes from three flags held on the node
 - **Runtime Code Mapper** — Rewrites event codes, with a switch that turns the map off
 - **Runtime Temp Layer** — Raises a layer while a pointer is in use, on a layer and timers held on the node
@@ -99,6 +99,17 @@ to them:
 
 Boards override the destination layer and excluded physical positions on the
 temp-layer node when needed.
+
+### Event type and code bounds
+
+The scaler, transform and code mapper accept the full Zephyr input-event ABI:
+`type` is 0 through 255, and every `codes`, `x-codes`, `y-codes` or `map` entry
+is 0 through 65535. Every original devicetree element is checked before it is
+stored; negative and overflowing values fail the build with a property-specific
+message instead of aliasing a different event. The first, second and last list
+entries are checked equally. Omitting `type` still selects `INPUT_EV_REL` (2).
+Empty code lists remain valid; transform lists still need equal lengths and a
+map still needs complete from/to pairs.
 
 ## Naming
 
@@ -235,13 +246,16 @@ doing nothing.
 `zmk,input-processor-runtime-scaler` scales relative pointer events, like ZMK's
 own `zmk,input-processor-scaler`. It differs in two ways.
 
-**The arithmetic is done in 64 bits.** The stock scaler holds
-`event->value * multiplier` in an `int16_t`, so with a multiplier of 889 any
-delta of 37 or more wraps negative before it is divided, and the pointer jumps
-backwards exactly when it is moving fastest. A runtime scaler that copies the
-expression inherits the same reversal. Here the numerator and quotient are `int64_t`
-and an out-of-range quotient saturates instead of wrapping, so a fast movement
-stays a fast movement.
+**The arithmetic uses checked 32-bit operations.** The stock scaler narrows
+the product to `int16_t`, so 37 multiplied by 889 reverses sign before division.
+This scaler checks the product and carried fraction before using the ordinary
+32-bit divider. Larger inputs are split into whole and fractional parts before
+multiplication; this preserves the full input range, signed truncation and
+tracked remainder without wide arithmetic. Out-of-range results saturate.
+
+Ratios `1/1` and `0/1` clear any old listener fraction and return the
+input or zero without multiplication or division. Other ratios retain their
+signed fraction, saturation and runtime-update behavior.
 
 **The ratio is a property, not a pair of chain cells.** That is what makes it
 addressable: a chain cell can only be identified as "the second number in the
@@ -459,6 +473,12 @@ update. Setting it to zero cancels the pending timeout. Any activation queued
 before a parameter update is discarded, so an event observed under old
 parameters cannot raise either the old or the new layer afterwards.
 
+Layer clocks use `uint32_t` milliseconds and explicit pending-deadline
+state, so a deadline of zero after wrap is valid. Deadline ordering assumes
+elapsed observations below 2^31 ms; long silent spans can be ambiguous. The
+typing guard conservatively suppresses activation for a key timestamp
+interpreted as future.
+
 Three things differ from upstream beyond the parameters:
 
 - **Work items are per instance.** Upstream keeps one global array indexed by
@@ -595,6 +615,10 @@ The option needs `zmk-feature-custom-settings`, and so the patched ZMK that
 carries the custom Studio RPC protocol. Processors can also be driven from C
 directly — see `include/zmk-input-processors/runtime_scaler.h`.
 
+Concurrent settings notifications serialize their complete read/apply transactions,
+so an older snapshot cannot overwrite a later edit. Input processing keeps its
+existing locks; the additional adapter lock is used only for settings events.
+
 ## Project Structure
 
 ```
@@ -641,31 +665,21 @@ builds, with the source tree mounted read-only:
 
 ```bash
 bash ./tests/run-docker.sh
+ZMK_TEST_MODE=full bash ./tests/run-docker.sh
 bash ./tests/run-integration-docker.sh
 ```
 
-`run-docker.sh` runs the contract tests in `tests/unit/`, one program for each
-header of dependency-free logic the drivers call. Each is built four ways --
-optimised, under AddressSanitizer and UndefinedBehaviorSanitizer, with
-coverage instrumentation, and as a 32-bit program like the firmware it models
--- and the headers also have to
-compile on their own, free of Zephyr, under `-Wconversion`. The scaler is
-checked against values pinned from the hardware session that found the
-reversal, a reference model, a million random cases, and the invariant that no
-movement is lost or invented. The transform, the code map and the temp-layer
-policy are checked across their whole input domains.
-CI requires 100% line and branch coverage of the four pure math/policy
-headers. The same command then lifts production functions out of the drivers
-into the stubbed harnesses in `tests/runtime/` -- five from the code mapper,
-eight from the scaler, seven from the transform, thirteen from the temp layer
-(its work items, settings writes and key, position and layer events), and the
-shared setting readers and duplicate-key check -- runs each optimized, under
-ASan/UBSan and with coverage, and requires 100% line and branch coverage of
-each source file separately. Each processor's settings bridge and the temp
-layer's listener are lifted with their macros too, and the runner fails if
-any function in the sources has no gate. Devicetree instantiation and the
-listener registrations themselves are covered by the integration suites
-below rather than by a percentage.
+The default `quick` host mode runs every behavioral scenario under ASan/UBSan,
+including the dependency-free unit headers and production driver/settings
+fixtures. The headers must also compile independently of Zephyr under
+`-Wconversion`; infrastructure and admission checks run in both modes.
+
+`ZMK_TEST_MODE=full` retains those scenarios and adds the optimized, measured
+coverage and existing 32-bit variants. Complete function/line/branch gates remain
+required in full mode; quick is not a coverage result. See the current
+[owner test guide](tests/README.md) for the fixture map, role/kernel checks,
+fresh-output commands and explicit physical acceptance gaps. Devicetree
+instantiation and listener registration remain integration checks.
 
 `run-integration-docker.sh` fetches the DYA ZMK fork with
 `zmk-feature-custom-settings`, and upstream ZMK without it -- and no keyboard
@@ -710,7 +724,3 @@ parameter and its optional Studio publication.
 ## Contributing
 
 Contributions are welcome! Please follow the coding patterns and conventions documented in [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
-
-Concurrent settings notifications serialize their complete read/apply transactions,
-so an older snapshot cannot overwrite a later edit. Input processing keeps its
-existing locks; the additional adapter lock is used only for settings events.

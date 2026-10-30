@@ -8,7 +8,7 @@
 # ZMK compiles with -Wfatal-errors, so a source file stops at its first failed
 # assertion. A case therefore breaks at most one node per source file, after
 # the shared nodes that sit exactly at each limit, which are checked first and
-# have to pass. Only this module's own objects are built, cases in parallel.
+# have to pass. Only this module's own objects are built, one case at a time.
 
 set -euo pipefail
 
@@ -63,23 +63,26 @@ run_case() {
 }
 
 mkdir -p "$build_root"
-pids=()
-names=()
-
-for keymap in "$cases_dir"/*/native_sim.keymap; do
-    case_dir="$(dirname "$keymap")"
-    names+=("$(basename "$case_dir")")
-    run_case "$case_dir" >"$build_root/$(basename "$case_dir").result" 2>&1 &
-    pids+=("$!")
-done
-
+case_dirs=()
+if [ "$#" -gt 0 ]; then
+    for name in "$@"; do
+        if [[ ! "$name" =~ ^[a-z0-9-]+$ ]] || [ ! -f "$cases_dir/$name/native_sim.keymap" ]; then
+            echo "unknown guard case: $name" >&2
+            exit 2
+        fi
+        case_dirs+=("$cases_dir/$name")
+    done
+else
+    for keymap in "$cases_dir"/*/native_sim.keymap; do
+        case_dirs+=("$(dirname "$keymap")")
+    done
+fi
 status=0
-
-for i in "${!pids[@]}"; do
-    if ! wait "${pids[$i]}"; then
+for case_dir in "${case_dirs[@]}"; do
+    name="$(basename "$case_dir")"
+    if ! run_case "$case_dir" >"$build_root/$name.result" 2>&1; then
         status=1
     fi
-    cat "$build_root/${names[$i]}.result"
+    cat "$build_root/$name.result"
 done
-
 exit "$status"

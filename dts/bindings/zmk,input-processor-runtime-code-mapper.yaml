@@ -21,7 +21,8 @@ properties:
     description: >-
       Event type to act on, from
       zephyr/dt-bindings/input/input-event-codes.h. The default is INPUT_EV_REL
-      (2).
+      (2). Must be 0-255, matching the input event type ABI; out-of-range
+      raw values fail the build before conversion to internal storage.
   map:
     type: array
     required: true
@@ -29,7 +30,9 @@ properties:
       From/to code pairs, flattened: an even number of entries, each odd entry
       the code to match and the following one the code it becomes. The first
       match wins and no further pair is considered, so a chain of rewrites is
-      not possible in one instance.
+      not possible in one instance. Every from and to entry must be 0-65535;
+      invalid raw values fail the build before conversion to internal storage.
+      An empty table is allowed.
   start-disabled:
     type: boolean
     description: >-

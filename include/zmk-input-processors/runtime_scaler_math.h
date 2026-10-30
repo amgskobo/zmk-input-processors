@@ -49,19 +49,25 @@ static inline bool runtime_scaler_params_valid(uint32_t multiplier, uint32_t div
  * Scales one value, carrying the fraction division discards in *remainder
  * when one is supplied.
  *
- * The multiplication is done in int64_t. This is the whole point: ZMK's own
- * scaler holds the product in an int16_t, so a multiplier of 889 makes every
- * delta of 37 or more come out negative, and the pointer jumps backwards
- * exactly when it is moving fastest.
- *
- * The quotient can still leave int32_t even though the arithmetic cannot
- * overflow, so it saturates. Saturating keeps a large delta large; wrapping
- * would reverse it, which is the failure this function exists to avoid.
+ * Normal inputs use a checked 32-bit multiply/add and one division. If that
+ * numerator does not fit, divide the input first: the remaining product is
+ * bounded by (divisor - 1) * multiplier plus one carried fraction, which fits
+ * int32_t for the supported parameters. No wide integer or software wide
+ * division is needed, including for full-range input and saturated results.
  */
 static inline int32_t runtime_scaler_scale(int32_t value, uint32_t multiplier, uint32_t divisor,
                                            int16_t *remainder) {
-    int64_t numerator = (int64_t)value * (int64_t)multiplier;
+    /* A unit divisor cannot retain a fraction, including one from an old ratio.
+     * Keep the placed pass-through and axis-kill stages free of multiplication
+     * and division. Larger divisors must still spend their valid carried part. */
+    if (divisor == 1U && multiplier <= 1U) {
+        if (remainder != NULL) {
+            *remainder = 0;
+        }
+        return multiplier == 0U ? 0 : value;
+    }
 
+    int32_t carried = 0;
     if (remainder != NULL) {
         /*
          * A remainder left by a different divisor is discarded rather than
@@ -79,23 +85,40 @@ static inline int32_t runtime_scaler_scale(int32_t value, uint32_t multiplier, u
             *remainder = 0;
         }
 
-        numerator += *remainder;
+        carried = *remainder;
     }
 
-    int64_t scaled = numerator / (int64_t)divisor;
+    const int32_t mul = (int32_t)multiplier;
+    const int32_t div = (int32_t)divisor;
+    int32_t numerator;
+    if (!__builtin_mul_overflow(value, mul, &numerator) &&
+        !__builtin_add_overflow(numerator, carried, &numerator)) {
+        if (remainder != NULL) {
+            *remainder = (int16_t)(numerator % div);
+        }
+        return numerator / div;
+    }
 
+    const int32_t whole = value / div;
+    const int32_t fraction = (value % div) * mul + carried;
+    int32_t extra = fraction / div;
+    int32_t rest = fraction % div;
+    /* Truncation is applied to the full signed numerator, once. */
+    if (whole > 0 && rest < 0) {
+        extra--;
+        rest += div;
+    } else if (whole < 0 && rest > 0) {
+        extra++;
+        rest -= div;
+    }
     if (remainder != NULL) {
-        /* |remainder| < divisor <= INT16_MAX, so the int16_t slot holds it. */
-        *remainder = (int16_t)(numerator - scaled * (int64_t)divisor);
+        *remainder = (int16_t)rest;
     }
 
-    if (scaled > INT32_MAX) {
-        return INT32_MAX;
+    int32_t output;
+    if (__builtin_mul_overflow(whole, mul, &output) ||
+        __builtin_add_overflow(output, extra, &output)) {
+        return value < 0 ? INT32_MIN : INT32_MAX;
     }
-
-    if (scaled < INT32_MIN) {
-        return INT32_MIN;
-    }
-
-    return (int32_t)scaled;
+    return output;
 }

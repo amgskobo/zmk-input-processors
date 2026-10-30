@@ -31,6 +31,7 @@
 #include <zmk-input-processors/runtime_transform.h>
 
 #include "runtime_test.h"
+#include "runtime_temp_layer_timeout.h"
 
 static const struct device *const scale = DEVICE_DT_GET(DT_NODELABEL(rt_scale));
 static const struct device *const xform = DEVICE_DT_GET(DT_NODELABEL(rt_xform));
@@ -705,12 +706,37 @@ static void test_two_touch_activations_queued_together(void) {
     rt_finish(&t);
 }
 
+static void verify_timeout_conversion(void) {
+    static const uint32_t rates[] = {1, 100, 1000, 32768, 71582, 71583, UINT32_MAX};
+    static const uint32_t remaining[] = {
+        60001, 65535, 65536, 131071, 131072, INT32_MAX,
+        (uint32_t)INT32_MAX + 1U, UINT32_MAX - 1U, UINT32_MAX,
+    };
+    for (unsigned h = 0; h < ARRAY_SIZE(rates); ++h) {
+        const uint32_t hz = rates[h];
+        for (uint32_t ms = 0; ms <= RUNTIME_TEMP_LAYER_MAX_MS; ++ms) {
+            const k_ticks_t expected = (k_ticks_t)(IS_ENABLED(CONFIG_TIMEOUT_64BIT) ?
+                z_tmcvt_64(ms, 1000U, hz, true, true, false) :
+                z_tmcvt_32(ms, 1000U, hz, true, true, false));
+            __ASSERT_NO_MSG(runtime_temp_layer_timeout_ticks(ms, hz) == expected);
+        }
+        for (unsigned n = 0; n < ARRAY_SIZE(remaining); ++n) {
+            const uint32_t ms = remaining[n];
+            const k_ticks_t expected = (k_ticks_t)(IS_ENABLED(CONFIG_TIMEOUT_64BIT) ?
+                z_tmcvt_64(ms, 1000U, hz, true, true, false) :
+                z_tmcvt_32(ms, 1000U, hz, true, true, false));
+            __ASSERT_NO_MSG(runtime_temp_layer_timeout_ticks(ms, hz) == expected);
+        }
+    }
+}
+
 static void run_tests(void *p1, void *p2, void *p3) {
     ARG_UNUSED(p1);
     ARG_UNUSED(p2);
     ARG_UNUSED(p3);
 
     k_work_init(&work_block, work_block_cb);
+    verify_timeout_conversion();
 
     test_scaler_ratio();
     test_scaler_remainder();

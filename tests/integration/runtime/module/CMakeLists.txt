@@ -5,6 +5,7 @@
 # module's own settings sources, so ZMK's and custom-settings' headers resolve.
 
 if(CONFIG_ZMK_INPUT_PROCESSORS_TEST_DRIVERS)
+    target_include_directories(app PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../../../drivers/input)
     target_sources(app PRIVATE src/drivers_test.c)
 endif()
 

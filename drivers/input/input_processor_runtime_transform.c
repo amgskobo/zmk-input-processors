@@ -144,7 +144,22 @@ static const struct zmk_input_processor_driver_api runtime_transform_driver_api 
     .handle_event = runtime_transform_handle_event,
 };
 
+#define RUNTIME_TRANSFORM_ASSERT_X_CODE(idx, n)                                                   \
+    BUILD_ASSERT(DT_INST_PROP_BY_IDX(n, x_codes, idx) >= 0 &&                                    \
+                     DT_INST_PROP_BY_IDX(n, x_codes, idx) <= UINT16_MAX,                         \
+                 "x-codes entries must be 0-65535");
+
+#define RUNTIME_TRANSFORM_ASSERT_Y_CODE(idx, n)                                                   \
+    BUILD_ASSERT(DT_INST_PROP_BY_IDX(n, y_codes, idx) >= 0 &&                                    \
+                     DT_INST_PROP_BY_IDX(n, y_codes, idx) <= UINT16_MAX,                         \
+                 "y-codes entries must be 0-65535");
+
 #define RUNTIME_TRANSFORM_INST(n)                                                                  \
+    BUILD_ASSERT(DT_INST_PROP_OR(n, type, INPUT_EV_REL) >= 0 &&                                 \
+                     DT_INST_PROP_OR(n, type, INPUT_EV_REL) <= UINT8_MAX,                        \
+                 "type must be 0-255");                                                          \
+    LISTIFY(DT_INST_PROP_LEN(n, x_codes), RUNTIME_TRANSFORM_ASSERT_X_CODE, (), n)                 \
+    LISTIFY(DT_INST_PROP_LEN(n, y_codes), RUNTIME_TRANSFORM_ASSERT_Y_CODE, (), n)                 \
     static const uint16_t runtime_transform_x_codes_##n[] = DT_INST_PROP(n, x_codes);              \
     static const uint16_t runtime_transform_y_codes_##n[] = DT_INST_PROP(n, y_codes);              \
     BUILD_ASSERT(ARRAY_SIZE(runtime_transform_x_codes_##n) ==                                      \

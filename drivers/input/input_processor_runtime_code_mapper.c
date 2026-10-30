@@ -108,7 +108,16 @@ static const struct zmk_input_processor_driver_api runtime_code_mapper_driver_ap
     .handle_event = runtime_code_mapper_handle_event,
 };
 
+#define RUNTIME_CODE_MAPPER_ASSERT_CODE(idx, n)                                                   \
+    BUILD_ASSERT(DT_INST_PROP_BY_IDX(n, map, idx) >= 0 &&                                        \
+                     DT_INST_PROP_BY_IDX(n, map, idx) <= UINT16_MAX,                             \
+                 "map entries must be 0-65535");
+
 #define RUNTIME_CODE_MAPPER_INST(n)                                                                \
+    BUILD_ASSERT(DT_INST_PROP_OR(n, type, INPUT_EV_REL) >= 0 &&                                 \
+                     DT_INST_PROP_OR(n, type, INPUT_EV_REL) <= UINT8_MAX,                        \
+                 "type must be 0-255");                                                          \
+    LISTIFY(DT_INST_PROP_LEN(n, map), RUNTIME_CODE_MAPPER_ASSERT_CODE, (), n)                      \
     BUILD_ASSERT(DT_INST_PROP_LEN(n, map) % 2 == 0,                                                \
                  "map is a list of from/to pairs, so it needs an even number of entries");         \
     static const uint16_t runtime_code_mapper_map_##n[] = DT_INST_PROP(n, map);                    \

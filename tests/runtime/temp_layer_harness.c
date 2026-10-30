@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <zmk-input-processors/runtime_temp_layer_policy.h>
+#include "runtime_temp_layer_timeout.h"
 
 typedef int32_t atomic_t;
 typedef int32_t atomic_val_t;
@@ -41,8 +42,9 @@ struct runtime_temp_layer_data {
     atomic_val_t pending_generation;
     atomic_t generation;
     uint8_t active_layer;
-    int64_t last_tapped;
-    int64_t deactivate_at;
+    uint32_t last_tapped;
+    uint32_t deactivate_at;
+    bool timeout_pending;
     bool force_deactivate;
     struct k_work activate_work;
     struct k_work_delayable deactivate_work;
@@ -57,6 +59,8 @@ struct runtime_temp_layer_data {
 #define K_FOREVER ((k_timeout_t){-1})
 #define K_NO_WAIT ((k_timeout_t){0})
 #define K_MSEC(ms) ((k_timeout_t){(ms)})
+#define K_TICKS(value) ((k_timeout_t){(value)})
+#define CONFIG_SYS_CLOCK_TICKS_PER_SEC 1000
 #define ZMK_EV_EVENT_BUBBLE 0
 #define ZMK_INPUT_PROC_CONTINUE 0
 #define ZMK_KEYMAP_LAYERS_LEN 8
@@ -84,7 +88,7 @@ static bool runtime_temp_layer_device_valid(const struct device *dev);
 static atomic_val_t atomic_get(const atomic_t *value) { return *value; }
 static void atomic_set(atomic_t *value, atomic_val_t next) { *value = next; }
 static void atomic_inc(atomic_t *value) { (*value)++; }
-static int64_t k_uptime_get(void) { return now_ms; }
+static uint32_t k_uptime_get_32(void) { return (uint32_t)now_ms; }
 static void k_mutex_init(struct k_mutex *mutex) { mutex->depth = 0; }
 static int k_mutex_lock(struct k_mutex *mutex, k_timeout_t timeout) {
     ARG_UNUSED(timeout);
@@ -296,6 +300,7 @@ static void test_raise_and_timeout(void) {
     assert(data.is_active);
     data.params.timeout_ms = 100;
     data.deactivate_at = 0;
+    data.timeout_pending = false;
     run_deactivate();
     assert(data.is_active);
     lock_failures = 1;
@@ -304,16 +309,19 @@ static void test_raise_and_timeout(void) {
 
     /* The keymap refused to drop a locked layer; the processor believes it. */
     locked_layers = 1U << 2;
-    data.deactivate_at = now_ms;
+    data.deactivate_at = (uint32_t)now_ms;
+    data.timeout_pending = true;
     run_deactivate();
     assert(data.is_active && zmk_keymap_layer_active(2));
     locked_layers = 0;
-    data.deactivate_at = now_ms;
+    data.deactivate_at = (uint32_t)now_ms;
+    data.timeout_pending = true;
     run_deactivate();
     assert(!data.is_active);
 
     /* Not held: the guard's is_active operand. */
-    data.deactivate_at = now_ms;
+    data.deactivate_at = (uint32_t)now_ms;
+    data.timeout_pending = true;
     run_deactivate();
     assert(!data.is_active);
 }
@@ -549,6 +557,24 @@ static void test_transition_lock_cleanup(void) {
     assert(!data.is_active && runtime_temp_layer_transition_lock.depth == 0);
 }
 
+static void test_clock_wrap(void) {
+    active_layers = 0;
+    locked_layers = 0;
+    data.is_active = false;
+    struct runtime_temp_layer_params params = params_of(true, 2, 10, 0);
+    assert(runtime_temp_layer_set_params(&valid_device, &params) == 0);
+    now_ms = UINT32_MAX - 9U;
+    assert(input() == 0);
+    run_activate();
+    assert(data.is_active && data.timeout_pending && data.deactivate_at == 0U);
+    now_ms = UINT32_MAX;
+    run_deactivate();
+    assert(data.is_active && data.deactivate_work.delay_ms == 1);
+    now_ms = (int64_t)UINT32_MAX + 2;
+    run_deactivate();
+    assert(!data.is_active && !data.timeout_pending);
+}
+
 int main(void) {
     static const uint16_t excluded[] = {7, 9};
     static const uint16_t blockers[] = {5, 6};
@@ -564,6 +590,7 @@ int main(void) {
     test_settings_while_held();
     test_events();
     test_transition_lock_cleanup();
+    test_clock_wrap();
     assert(data.lock.depth == 0);
     assert(runtime_temp_layer_transition_lock.depth == 0);
     /* Every device in the list counts, the first as much as the last. */

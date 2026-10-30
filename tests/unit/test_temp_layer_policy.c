@@ -118,26 +118,26 @@ static void test_typing_guard(void) {
     EXPECT_FALSE(runtime_temp_layer_is_typing(1000, 300, 1300), "the first free millisecond");
     EXPECT_FALSE(runtime_temp_layer_is_typing(1000, 300, 60000), "long after the press");
 
-    /* The comparison must not overflow at either end of the signed uptime range. */
-    EXPECT_TRUE(runtime_temp_layer_is_typing(INT64_MAX, UINT16_MAX, INT64_MAX),
+    /* The comparison must not overflow at either end of the modulo uptime range. */
+    EXPECT_TRUE(runtime_temp_layer_is_typing(UINT32_MAX, UINT16_MAX, UINT32_MAX),
                 "maximum timestamp at the instant of the press");
-    EXPECT_TRUE(runtime_temp_layer_is_typing(INT64_MAX, UINT16_MAX, INT64_MAX - 1),
+    EXPECT_TRUE(runtime_temp_layer_is_typing(UINT32_MAX, UINT16_MAX, UINT32_MAX - 1),
                 "future maximum timestamp");
-    EXPECT_FALSE(runtime_temp_layer_is_typing(INT64_MIN, UINT16_MAX, INT64_MAX),
-                 "the whole signed range after the press");
+    EXPECT_FALSE(runtime_temp_layer_is_typing(0, UINT16_MAX, INT32_MAX),
+                 "the largest unambiguous forward idle");
 
     static const uint16_t idles[] = {1, 2, 300, UINT16_MAX};
-    static const int64_t presses[] = {0, 1, 123456789, INT64_C(1) << 40};
+    static const uint32_t presses[] = {0, 1, 123456789, UINT32_MAX - 100};
 
     for (size_t g = 0; g < ARRAY_LEN(idles); g++) {
         for (size_t p = 0; p < ARRAY_LEN(presses); p++) {
-            const int64_t end = presses[p] + idles[g];
+            const uint32_t end = presses[p] + idles[g];
 
             EXPECT_TRUE(runtime_temp_layer_is_typing(presses[p], idles[g], end - 1),
-                        "idle %u, press %" PRId64 ", last blocked", (unsigned int)idles[g],
+                        "idle %u, press %" PRIu32 ", last blocked", (unsigned int)idles[g],
                         presses[p]);
             EXPECT_FALSE(runtime_temp_layer_is_typing(presses[p], idles[g], end),
-                         "idle %u, press %" PRId64 ", first free", (unsigned int)idles[g],
+                         "idle %u, press %" PRIu32 ", first free", (unsigned int)idles[g],
                          presses[p]);
         }
     }

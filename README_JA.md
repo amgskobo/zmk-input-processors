@@ -4,12 +4,6 @@
 
 [English](README.md)
 
-仮レイヤーの変更は、全インスタンス共通のロックを取ってから各インスタンスの
-ロックを取ります。ワーカーからの有効化と、別インスタンスのキー位置による解除が
-同時に起きても、同期的なレイヤー通知を通じて互いを待ち続ける状態を防ぎます。
-キー位置による解除は、従来通りそのコールバックが戻る前に行います。
-[カーネル回帰テストと確認範囲](tests/transition-lock/README.md)を参照してください。
-
 ZMK 標準の input processor を、実行中に設定変更できるようにしたものです。
 
 ZMK には設定可能な input processor が 4 つ(scaler、transform、code-mapper、
@@ -34,7 +28,7 @@ temp-layer)ありますが、そのパラメーターは devicetree からビル
 
 ## Features
 
-- **Runtime Scaler** — node に保持した比率で pointer event を 64-bit 演算で拡大縮小
+- **Runtime Scaler** — node に保持した比率で pointer event を範囲検査付きの32-bit演算で拡大縮小
 - **Runtime Transform** — node に保持した 3 つの flag で軸の入れ替え・反転
 - **Runtime Code Mapper** — event code を書き換え。map 全体を無効にする switch 付き
 - **Runtime Temp Layer** — pointer 使用中にレイヤーを上げる。レイヤーとタイマーは node に保持
@@ -106,6 +100,16 @@ ZMK の board を見つけられず失敗します。
 
 必要に応じて、board 側で temp-layer node の対象レイヤーと除外する物理位置を
 上書きします。
+
+### event type と code の範囲
+
+scaler、transform、code mapper は Zephyr の input event の型全体を扱います。
+`type` は 0〜255、`codes`、`x-codes`、`y-codes`、`map` の各要素は 0〜65535 です。
+元の devicetree の全要素を格納前に検査するため、負数や上限を超える値が別の event に
+化けることはなく、property を示すメッセージでビルドが失敗します。先頭だけでなく、
+2 番目以降と末尾も同じ条件で検査します。`type` の省略時は従来通り `INPUT_EV_REL` (2) です。
+空の code 一覧も使えます。transform の 2 一覧は同じ長さ、map は from/to の組という
+条件も維持します。
 
 ## 命名
 
@@ -237,12 +241,15 @@ processor を追加する人向けにもう 1 点あります。devicetree の�
 `zmk,input-processor-runtime-scaler` は、ZMK の `zmk,input-processor-scaler` と
 同じく相対 pointer event を拡大縮小します。違いは 2 つです。
 
-**演算は 64 bit で行います。** 標準の scaler は `event->value * multiplier` を
-`int16_t` に保持するため、multiplier が 889 のとき 37 以上の delta は除算前に
-負の値へ折り返し、最も速く動かしているときに pointer が逆方向へ飛びます。この式を
-そのまま引き継いだ runtime scaler も、同じ反転を起こします。ここでは分子と商を
-`int64_t` で扱い、範囲外の商は折り返さず飽和させるため、速い動きは速いまま
-出力されます。
+**演算には範囲検査付きの32ビット整数を使います。** 標準版は積を`int16_t`へ
+格納するため、37を889倍した時点で符号が反転します。この実装は積と端数の加算を
+検査してから32ビットで除算します。中間値が収まらない場合は、入力を商と余りに
+分けてから乗算し、入力範囲全体・符号付きの丸め・端数保持を維持します。
+64ビット演算への切り替えはなく、範囲外の結果は飽和させます。
+
+倍率が `1/1` または `0/1` の場合は、以前のlistenerの端数を消し、
+入力値またはゼロを返して乗算と除算を省略します。他の倍率では、符号付き端数、
+飽和、実行中の設定変更の扱いを維持します。
 
 **比率は chain cell の組ではなく property です。** これが名前で指定できる理由です。
 chain cell は「この listener の 4 番目の slot の 2 番目の数値」としか指定できず、
@@ -432,6 +439,12 @@ item が、それを取り消した event の後にレイヤーを上げるこ�
 worker は有効化の前後でこれを確認し、レイヤー event の配信中に編集が届いた場合は、
 その有効化をただちに取り消します。
 
+仮レイヤーの変更は、全インスタンス共通のロックを取ってから各インスタンスの
+ロックを取ります。ワーカーからの有効化と、別インスタンスのキー位置による解除が
+同時に起きても、同期的なレイヤー通知を通じて互いを待ち続ける状態を防ぎます。
+キー位置による解除は、従来通りそのコールバックが戻る前に行います。
+[カーネル回帰テストと確認範囲](tests/transition-lock/README.md)を参照してください。
+
 `excluded-positions` は構造的な値のままです。キー位置のリストは汎用の設定一覧では
 表現できず、好みではなく物理レイアウトに属するものだからです。この property を
 省略すると位置による解除はすべて無効になり、レイヤーを下げられるのは 0 以外の
@@ -441,6 +454,11 @@ timeout か processor を無効にしたときだけになります。
 やり直します。0 にすると保留中の timeout を取り消します。パラメーター更新より前に
 キューされた有効化は破棄されるため、古いパラメーターで観測した event が、その後に
 古いレイヤーも新しいレイヤーも上げることはありません。
+
+時刻は `uint32_t` のミリ秒値で管理し、保留中の期限があるかを別に保持します。
+一周後の期限ゼロも有効です。期限や観測の比較は、経過時間が2の31乗ミリ秒未満の
+場合に限ります。長期間の無入力は区別できない場合があります。typing guardは、
+未来と解釈したキーの時刻に対して保守的にレイヤーの有効化を抑止します。
 
 パラメーター以外にも、upstream との違いが 3 つあります。
 
@@ -569,6 +587,10 @@ driver はすでに devicetree の値で動いているからです。
 Studio RPC protocol を持つ ZMK が必要です。processor は C から直接操作することも
 できます。`include/zmk-input-processors/runtime_scaler.h` を参照してください。
 
+並行する設定通知は、読み取りから適用までを直列化します。古いスナップショットが
+後から新しい編集を上書きすることを防ぎます。追加のロックは設定通知だけで使い、
+通常の入力処理経路では使いません。
+
 ## プロジェクト構成
 
 ```
@@ -618,22 +640,16 @@ bash ./tests/run-docker.sh
 bash ./tests/run-integration-docker.sh
 ```
 
-`run-docker.sh` は `tests/unit/` の契約テストを実行します。driver が呼び出す、
-依存のないロジックのヘッダーごとに 1 つのプログラムがあります。それぞれを
-最適化ビルド、AddressSanitizer と UndefinedBehaviorSanitizer 付きのビルド、
-カバレッジ計測、ファームウェアと同じ 32-bit プログラムの 4 通りでビルドし、ヘッダーは Zephyr なしで
-`-Wconversion` 付きの単独コンパイルも通す必要があります。scaler は、反転を発見した
-実機セッションで記録した値、参照モデル、100 万件のランダムケース、移動量が失われも
-増えもしないという不変条件で検査します。transform、code map、temp-layer policy は
-入力の全範囲で検査します。
-CIは4つの純粋な算術・ポリシーヘッダーの行・分岐100%を要求します。
-同じコマンドで、製品driverから関数を抽出して `tests/runtime/` のスタブ付きハーネスに
-組み込みます。code mapperから5関数、scalerから8関数、transformから7関数、temp layerから
-13関数(work item、設定の書き込み、キー・position・layer event)、共通の設定読み出しと
-重複キー検査です。最適化、ASan/UBSan、カバレッジの3構成で実行し、ソースファイルごとに
-行・分岐100%を要求します。各processorの設定ブリッジとtemp layerのlistenerもマクロごと
-取り出し、ソースにゲートのない関数が1つでもあればrunnerが失敗します。devicetreeからの
-インスタンス生成とlistenerの登録そのものは、割合ではなく下記の統合suiteで確認します。
+既定の `quick` は、全ての動作シナリオを ASan/UBSan 付きで一度ずつ実行します。
+依存のない算術・ポリシー、実際の driver と設定 adapter の fixture、テスト基盤と
+入力条件の検査を含みます。ヘッダーの単独コンパイルでは `-Wconversion` も使います。
+
+`ZMK_TEST_MODE=full bash ./tests/run-docker.sh` は同じシナリオを維持し、最適化、
+実測カバレッジ、既存の 32-bit ABI 構成も確認します。full では関数・実行行・分岐の
+検査を省略しません。quick の成功はカバレッジの結果ではありません。
+fixture の対応、role と kernel の検査、新しい出力先を使うコマンド、実機で残る確認範囲は
+[owner のテストガイド](tests/README.md)を参照してください。devicetree からの instance
+生成と listener 登録そのものは統合テストで確認します。
 
 `run-integration-docker.sh` は、`zmk-feature-custom-settings` を含む DYA ZMK fork と、
 それを含まない upstream ZMK を取得し(キーボード設定や他の input processor module は
@@ -678,7 +694,3 @@ module の構成、正しさの規則、必要なテスト、ローカル checko
 
 コントリビューションを歓迎します。[.github/CONTRIBUTING.md](.github/CONTRIBUTING.md)
 に記載したコーディングパターンと規約に従ってください。
-
-並行する設定通知は、読み取りから適用までを直列化します。古いスナップショットが
-後から新しい編集を上書きすることを防ぎます。追加のロックは設定通知だけで使い、
-通常の入力処理経路では使いません。

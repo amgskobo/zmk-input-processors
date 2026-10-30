@@ -1,0 +1,3 @@
+static assertion failed: "x-codes entries must be 0-65535"
+static assertion failed: "codes entries must be 0-65535"
+static assertion failed: "map entries must be 0-65535"

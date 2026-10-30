@@ -1,0 +1,3 @@
+static assertion failed: "type must be 0-255"
+static assertion failed: "type must be 0-255"
+static assertion failed: "type must be 0-255"

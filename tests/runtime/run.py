@@ -253,9 +253,11 @@ for fixture, file_name, gated, support in fixtures:
                                         f'\n#line {resume} "{harness_path}"'), encoding="utf-8")
         for variant, flags in variants:
             binary = work / variant
+            timer_flags = ["-I" + str(root / "tests/timeout-stubs")] if fixture == "temp_layer" else []
             subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", *flags,
                             "-I" + str(root / "include"), "-I" + str(source_dir),
                             "-I" + str(root / "tests/runtime"),
+                            *timer_flags,
                             str(unit), "-o", str(binary)],
                            check=True)
             subprocess.run([str(binary)], check=True)

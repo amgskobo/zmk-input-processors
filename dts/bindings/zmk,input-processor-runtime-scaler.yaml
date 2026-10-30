@@ -6,7 +6,7 @@ description: |
 
   Unlike zmk,input-processor-scaler the ratio is a property rather than a pair
   of chain parameter cells, so it names a value a client can change while the
-  keyboard runs, and the arithmetic is done in 64 bits, so a large multiplier
+  keyboard runs, and checked 32-bit arithmetic with quotient decomposition means a large multiplier
   cannot turn a fast movement backwards.
 
 compatible: "zmk,input-processor-runtime-scaler"
@@ -20,12 +20,15 @@ properties:
     description: >-
       Event type to act on, from
       zephyr/dt-bindings/input/input-event-codes.h. The default is INPUT_EV_REL
-      (2).
+      (2). Must be 0-255, matching the input event type ABI; out-of-range
+      raw values fail the build before conversion to internal storage.
   codes:
     type: array
     required: true
     description: >-
       Event codes to scale. Codes not listed here pass through untouched.
+      Every entry must be 0-65535, matching the input event code ABI. Invalid
+      entries fail the build before conversion; an empty list is allowed.
   multiplier:
     type: int
     required: true

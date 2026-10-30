@@ -164,3 +164,65 @@ checks. Every element is now validated before uint16_t storage conversion.
 The shared positive nodes accept the first/last valid layer IDs and an explicit
 empty list; normal firmware/native nodes retain the omitted-list case. The
 runtime initialization checks and every earlier guard/assertion remain.
+
+## 32-bit arithmetic and clock contract
+
+Scaler products, fractions and saturated results use checked 32-bit arithmetic, including the full int32 input range. Layer clocks use uint32 milliseconds and explicit pending-deadline state, so a deadline of zero after wrap is valid. Half-range deadline ordering assumes delays/observations below 2^31 ms; long silent spans can be ambiguous. The typing guard conservatively suppresses a timestamp interpreted as future.
+
+Scalar: test_scaler.c independent wide reference, signed extremes, stale fractions, zero/identity and saturation; test_scaler_width.py rejects wide helpers in a 32-bit object. Layer: test_temp_layer_policy.c and runtime/temp_layer_harness.c retain guards/deadlines and add modulo-clock wrap/zero-deadline cases.
+
+## Native-width temporary-layer timeouts
+
+All three work reservations use `drivers/input/runtime_temp_layer_timeout.h`.
+The public0..60000ms range, zero disabling policy, modulo deadlines, queued-work
+cancellation, per-instance state and settings semantics remain unchanged. Normal
+settings at ordinary clock rates use a checked uint32 ceiling numerator. Higher
+clock rates and larger uint32 remaining durations use an exact seconds/fraction
+split, retaining the configured kernel tick width without software64-bit division.
+No timeout is clamped or narrowed.
+
+`unit/test_temp_layer_timeout.c` compares every0..60000ms value at14 rates,
+fulluint32 remaining-time boundaries and65536 deterministic full-range samples
+against an independent wide ceiling oracle. Full requires100% line/branch
+coverage of the private production header. `test_temp_layer_timeout_width.py`
+executes the same numeric file on a32-bit compiler ABI with32/64-bit tick forms
+and rejects wide helpers in the actual header object. Four identified rounding,
+unchecked-product, lost-fraction and lost-seconds faults each must compile and
+fail qualified C assertions three times per tick form. The compiled wide-divider
+control remains numerically correct but must fail the width guard. Host clock
+stand-ins live only under tests/timeout-stubs; native tests use real Zephyr types.
+
+The existing native drivers fixture additionally compares the same private
+production helper with pinned Zephyr conversion macros at7positive rates,
+every published wait and fulluint32 remaining boundaries. These checks add no
+normal output: all nineteen existing driver groups and both original snapshots
+are retained unchanged. Kernel routing/cancellation and transition-lock checks
+remain separate from physical HID/radio acceptance.
+
+```bash
+python3 -m unittest discover -s tests -p test_temp_layer_timeout_width.py -v
+```
+
+## Raw event ABI devicetree guards
+
+Raw event ABI DTS guards: the actual CMake/owner-object path rejects type -1/256
+on all three drivers and every x-codes/y-codes/codes/map first, second and last
+entry at -1/65536. Fourteen named fixtures include all list elements, not only
+index zero. Shared positive nodes compile type0/255, code0/65535, omitted type
+(default REL) and empty lists. Transform equal lengths and mapper pair counts
+remain unchanged. Before repair all14 malformed fixtures build on both stock
+and DYA; no snapshot or runtime assertion is weakened. Default guards retain
+all15 existing cases and add14; configure/build proceeds one case at a time.
+Stock raw-event checks select only these14 common fixtures; the existing Studio
+name-length fixtures remain DYA-only. Optional explicit guard case names select
+a focused run; the default canonical integration always runs all29 on DYA.
+
+The guards entry accepts explicit case basenames for an already resolved owner
+workspace. Supply a fresh `ZMK_TEST_WORK_DIR`, set `ZMK_TEST_ZMK_APP` to its
+`zmk/app`, and source/select `tests/integration/workspace-env.sh` first. For the
+stock-only raw subset, pass each `event-*` directory basename as an argument;
+the ordinary full integration command selects all guards on DYA automatically.
+
+## Unit-divisor fast paths
+
+For ratios 1/1 and 0/1, the scaler clears any carried fraction and returns the unchanged input or zero before generic multiplication/division. Other identity/zero ratios retain their signed fraction semantics. tests/cost/scaler_fastpath.c checks signed endpoints, every int16 carried value, null remainder, larger-divisor counterexamples and zero checked products in the actual header. The canonical quick/full entry includes this fixture. This operation count is not a CPU-cycle or physical HID measurement.

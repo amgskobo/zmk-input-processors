@@ -6,7 +6,7 @@
  *
  * Two differences from the stock processor, and nothing else:
  *
- * 1. The arithmetic is done in int64_t, and lives in runtime_scaler_math.h so a
+ * 1. Checked 32-bit arithmetic lives in runtime_scaler_math.h so a
  *    host test can pin it. The stock scaler holds `event->value * multiplier`
  *    in an int16_t, so a multiplier of 889 turns any delta of 37 or more
  *    negative before it is divided -- the pointer reverses exactly when it is
@@ -149,7 +149,16 @@ static const struct zmk_input_processor_driver_api runtime_scaler_driver_api = {
     .handle_event = runtime_scaler_handle_event,
 };
 
+#define RUNTIME_SCALER_ASSERT_CODE(idx, n)                                                        \
+    BUILD_ASSERT(DT_INST_PROP_BY_IDX(n, codes, idx) >= 0 &&                                      \
+                     DT_INST_PROP_BY_IDX(n, codes, idx) <= UINT16_MAX,                           \
+                 "codes entries must be 0-65535");
+
 #define RUNTIME_SCALER_INST(n)                                                                     \
+    BUILD_ASSERT(DT_INST_PROP_OR(n, type, INPUT_EV_REL) >= 0 &&                                 \
+                     DT_INST_PROP_OR(n, type, INPUT_EV_REL) <= UINT8_MAX,                        \
+                 "type must be 0-255");                                                          \
+    LISTIFY(DT_INST_PROP_LEN(n, codes), RUNTIME_SCALER_ASSERT_CODE, (), n)                        \
     BUILD_ASSERT(                                                                                  \
         RUNTIME_SCALER_DT_PARAMS_VALID(DT_INST_PROP(n, multiplier), DT_INST_PROP(n, divisor)),     \
         "multiplier must be 0-32767 and divisor 1-32767");                                         \

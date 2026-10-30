@@ -78,7 +78,11 @@ for source in "$repo_root"/tests/unit/test_*.c; do
         label="${variant%%:*}"
         read -r -a flags <<<"${variant#*:}"
 
-        cc "${warnings[@]}" "${flags[@]}" -I"$repo_root/include" "$source" \
+        timer_flags=()
+        if [ "$name" = test_temp_layer_timeout ]; then
+            timer_flags=(-I"$repo_root/drivers/input" -I"$repo_root/tests/timeout-stubs")
+        fi
+        cc "${warnings[@]}" "${flags[@]}" -I"$repo_root/include" "${timer_flags[@]}" "$source" \
             -o "$build_dir/$name-$label"
         printf '%s (%s): ' "${name#test_}" "$label"
         "$build_dir/$name-$label"
@@ -93,6 +97,10 @@ for core in runtime_code_mapper_math runtime_scaler_math runtime_temp_layer_poli
     printf '%s\n' "$core_report" | grep -Fq 'Lines executed:100.00%'
     printf '%s\n' "$core_report" | grep -Fq 'Taken at least once:100.00%'
 done
+
+timeout_report="$(printf '%s\n' "$coverage_report" | grep -F -A4 "File '$repo_root/drivers/input/runtime_temp_layer_timeout.h'")"
+printf '%s\n' "$timeout_report" | grep -Fq 'Lines executed:100.00%'
+printf '%s\n' "$timeout_report" | grep -Fq 'Taken at least once:100.00%'
 
 fi
 

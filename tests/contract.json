@@ -24,12 +24,20 @@
     {
       "fixture": "tests/runtime/custom_settings_harness.c",
       "asserts": "Settings bridge and validation"
+    },
+    {
+      "fixture": "tests/unit/test_temp_layer_timeout.c",
+      "asserts": "Actual private production timeout header: every0..60000 wait at14rates, fulluint32 remaining boundaries and65536 full-range deterministic samples against independent wide ceil. Complete header line/branch gate; m32 numeric/width tests for32/64tick forms. Four semantic faults each3qualified assertion failures pertype; compiled wide control numerically correct but width-rejected."
     }
   ],
   "limits": "Host tests do not compile all DTS combinations; retain owner negative guards and native fixtures for changed interfaces.",
   "blocked_layer_guards": {
     "entry": "tests/integration/run.sh guards",
-    "fixtures": ["tests/integration/guards/blocked-layer-over", "tests/integration/guards/blocked-layer-negative", "tests/integration/guards/blocked-layer-wrap"],
+    "fixtures": [
+      "tests/integration/guards/blocked-layer-over",
+      "tests/integration/guards/blocked-layer-negative",
+      "tests/integration/guards/blocked-layer-wrap"
+    ],
     "asserts": "Named compile rejection before uint16_t narrowing for an invalid second element, negative ID and 65536; first/last valid IDs, explicit empty list and omitted property remain valid. All three invalid fixtures compile before repair."
   },
   "kernel": [
@@ -40,7 +48,7 @@
   "kernel_contracts": [
     {
       "fixture": "tests/integration/runtime/module/src/drivers_test.c",
-      "asserts": "Nineteen existing native processor groups, including pending-work disable/settings updates and layer/deadline state; unchanged snapshot"
+      "asserts": "Nineteen existing native processor groups, including pending-work disable/settings updates and layer/deadline state; unchanged snapshot Additional quiet assertions compare actual production timeout header against real Zephyr macros at7positive rates for every published wait and full32-bit remaining boundaries; snapshot unchanged."
     },
     {
       "fixture": "tests/integration/runtime/dual_route/keycode_events.snapshot",
@@ -75,5 +83,26 @@
   "suppression_scope": "No button-pair/final-frame policy is owned here. Existing transform/layer/settings fixtures remain unchanged; AKKB relative-motion configuration composes with an independent final filter.",
   "scheduled_work_settings_review": "All four adapters now dispatch a changed descriptor only to its owning instance; initialization still applies every instance. The host bridge stand-in carries descriptor identity and covers foreign events and every own field. The DYA settings fixture uses the actual registry and worker queue: foreign-subsystem, same-subsystem scaler and peer-layer edits must preserve queued activation and the original idle deadline. Every write changes its value so notification suppression cannot hide this regression. Its snapshot adds the named unrelated-edit scenario; all prior lines remain. Direct temporary-layer API setters retain their documented reset behavior.",
   "concurrent_settings": "Each adapter serializes its complete registry read/apply transaction. The real DYA settings fixture pauses a read in writer A, commits writer B from a higher priority Zephyr thread, and verifies that the older snapshot cannot win. This adds a second named settings scenario; all old snapshot lines remain. Linker wrapping controls the real registry boundary only in the owner test module.",
-  "selected_workspace": "Workspace selection uses tests/integration/workspace-env.sh to export the selected manifest's ZEPHYR_MODULES and explicit Zephyr package/base paths. A Zephyr symlink to a different cache must not select that cache's module providers. The owner test_workspace_env.py exercises actual selection with a poisoned ambient list, a cache symlink, module paths containing spaces, failed project discovery and an empty selection. The keep-ambient negative control must fail these assertions. Full integration retains all supported-core, role, persistence and invalid-DTS cases. No dependency is patched or required feature disabled."
+  "selected_workspace": "Workspace selection uses tests/integration/workspace-env.sh to export the selected manifest's ZEPHYR_MODULES and explicit Zephyr package/base paths. A Zephyr symlink to a different cache must not select that cache's module providers. The owner test_workspace_env.py exercises actual selection with a poisoned ambient list, a cache symlink, module paths containing spaces, failed project discovery and an empty selection. The keep-ambient negative control must fail these assertions. Full integration retains all supported-core, role, persistence and invalid-DTS cases. No dependency is patched or required feature disabled.",
+  "integer_width": {
+    "production": "32-bit arithmetic; independent wider oracles remain test-only",
+    "contract": "Scaler products, fractions and saturated results use checked 32-bit arithmetic, including the full int32 input range. Layer clocks use uint32 milliseconds and explicit pending-deadline state, so a deadline of zero after wrap is valid. Half-range deadline ordering assumes delays/observations below 2^31 ms; long silent spans can be ambiguous. The typing guard conservatively suppresses a timestamp interpreted as future.",
+    "fixtures": "Scalar: test_scaler.c independent wide reference, signed extremes, stale fractions, zero/identity and saturation; test_scaler_width.py rejects wide helpers in a 32-bit object. Layer: test_temp_layer_policy.c and runtime/temp_layer_harness.c retain guards/deadlines and add modulo-clock wrap/zero-deadline cases.",
+    "physical": "NOT RUN",
+    "timeout_boundary": "Native32 divisions at all clock rates; configured k_ticks_t width retained for final product. Private helper supports fulluint32 remaining duration while public60000ms validation and half-range deadline semantics remain unchanged."
+  },
+  "raw_event_abi_guards": {
+    "entry": "tests/integration/guards/run.sh",
+    "fixtures": "tests/integration/guards/event-*",
+    "asserts": "Raw event ABI DTS guards: the actual CMake/owner-object path rejects type -1/256 on all three drivers and every x-codes/y-codes/codes/map first, second and last entry at -1/65536. Fourteen named fixtures include all list elements, not only index zero. Shared positive nodes compile type0/255, code0/65535, omitted type (default REL) and empty lists. Transform equal lengths and mapper pair counts remain unchanged. Before repair all14 malformed fixtures build on both stock and DYA; no snapshot or runtime assertion is weakened. Default guards retain all15 existing cases and add14; configure/build proceeds one case at a time. Stock raw-event checks select only these14 common fixtures; the existing Studio name-length fixtures remain DYA-only. Optional explicit guard case names select a focused run; the default canonical integration always runs all29 on DYA. ",
+    "supported_cores": [
+      "stock-zmk",
+      "dya"
+    ],
+    "physical": "NOT RUN"
+  },
+  "arithmetic_fast_paths": {
+    "contract": "For ratios 1/1 and 0/1, the scaler clears any carried fraction and returns the unchanged input or zero before generic multiplication/division. Other identity/zero ratios retain their signed fraction semantics. tests/cost/scaler_fastpath.c checks signed endpoints, every int16 carried value, null remainder, larger-divisor counterexamples and zero checked products in the actual header. The canonical quick/full entry includes this fixture. This operation count is not a CPU-cycle or physical HID measurement.",
+    "physical": "NOT RUN"
+  }
 }
