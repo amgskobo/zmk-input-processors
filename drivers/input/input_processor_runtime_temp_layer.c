@@ -278,7 +278,9 @@ int runtime_temp_layer_set_params(const struct device *dev,
     /* A queued event belongs to the parameters it observed. Do not let it
      * raise either the old or the new layer after a setting update. */
     data->activation_pending = false;
-    (void)k_work_cancel(&data->activate_work);
+    /* Generation and pending state retire the old request. Do not cancel a
+     * running work item: CANCELING would reject a new input's requeue until
+     * that callback returns, losing an otherwise valid isolated activation. */
 
     /*
      * A layer this processor is holding has nothing else responsible for

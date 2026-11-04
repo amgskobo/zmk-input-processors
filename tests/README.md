@@ -226,3 +226,18 @@ the ordinary full integration command selects all guards on DYA automatically.
 ## Unit-divisor fast paths
 
 For ratios 1/1 and 0/1, the scaler clears any carried fraction and returns the unchanged input or zero before generic multiplication/division. Other identity/zero ratios retain their signed fraction semantics. tests/cost/scaler_fastpath.c checks signed endpoints, every int16 carried value, null remainder, larger-divisor counterexamples and zero checked products in the actual header. The canonical quick/full entry includes this fixture. This operation count is not a CPU-cycle or physical HID measurement.
+
+## Activation while an old callback returns
+
+`ZMK_TEST_OUTPUT=FRESH bash tests/requeue/run.sh RESOLVED_WORKSPACE` builds the
+complete driver on either supported core and runs one binary three times. A
+linker wrapper pauses the real activation callback immediately after it releases
+its data mutex. A higher-priority valid setter invalidates that request, then
+exactly one new input must requeue the still-running work (Zephyr return value2)
+and activate its layer after the callback returns. Restoring asynchronous
+cancellation in the setter rejects that submission with -EBUSY. The host fixture
+retains stale-request rejection and adds the corresponding controlled interleaving.
+A retired queued callback may now run once without applying an old request.
+`ZMK_TEST_MODULE` optionally selects an unchanged prior compiler-input tree for
+the same native negative control; scenarios and assertions stay in this owner.
+This exercises the public C API and kernel, not physical Studio scheduling.

@@ -104,5 +104,12 @@
   "arithmetic_fast_paths": {
     "contract": "For ratios 1/1 and 0/1, the scaler clears any carried fraction and returns the unchanged input or zero before generic multiplication/division. Other identity/zero ratios retain their signed fraction semantics. tests/cost/scaler_fastpath.c checks signed endpoints, every int16 carried value, null remainder, larger-divisor counterexamples and zero checked products in the actual header. The canonical quick/full entry includes this fixture. This operation count is not a CPU-cycle or physical HID measurement.",
     "physical": "NOT RUN"
+  },
+  "activation_requeue": {
+    "host": "tests/runtime/temp_layer_harness.c",
+    "kernel": "tests/requeue/run.sh on unchanged stock and DYA; same binary three runs",
+    "contract": "A valid setter retires old activation without putting running work in CANCELING; one new input requeues and activates",
+    "negative": "Unmodified prior driver rejects submission with -EBUSY",
+    "limits": "Public C API scheduling; physical Studio priority reachability is separate"
   }
 }

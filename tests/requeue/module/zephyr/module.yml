@@ -1,0 +1,4 @@
+name: processors-requeue-test
+build:
+  cmake: .
+  kconfig: Kconfig
