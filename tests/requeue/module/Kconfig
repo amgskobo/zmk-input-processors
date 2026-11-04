@@ -1,0 +1,2 @@
+config ZMK_INPUT_PROCESSORS_REQUEUE_TEST
+    bool "Temporary-layer running activation requeue test"

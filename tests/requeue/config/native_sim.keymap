@@ -1,0 +1,13 @@
+/* SPDX-License-Identifier: MIT */
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/kscan_mock.h>
+/ {
+ keymap { compatible = "zmk,keymap";
+  base { bindings = <&none>; }; target { bindings = <&none>; }; blocker { bindings = <&none>; };
+ };
+ requeue_test: requeue_test {
+  compatible = "zmk,input-processor-runtime-temp-layer";
+  #input-processor-cells = <0>; layer = <1>; timeout-ms = <0>; blocked-by-layers = <2>;
+ };
+};
+&kscan { events = <ZMK_MOCK_PRESS(0,0,30000)>; };

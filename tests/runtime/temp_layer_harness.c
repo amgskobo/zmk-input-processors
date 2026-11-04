@@ -14,7 +14,7 @@ typedef int32_t atomic_t;
 typedef int32_t atomic_val_t;
 typedef struct { int64_t ms; } k_timeout_t;
 struct k_mutex { int depth; };
-struct k_work { void (*handler)(struct k_work *work); bool pending; };
+struct k_work { void (*handler)(struct k_work *work); bool pending; bool running; bool canceling; };
 struct k_work_delayable { struct k_work work; bool scheduled; int64_t delay_ms; };
 struct k_work_q { int unused; };
 struct device { const void *config; void *data; const char *name; };
@@ -76,6 +76,7 @@ static int64_t now_ms;
 static int lock_failures;
 static struct k_mutex *fail_on_mutex;
 static struct k_mutex runtime_temp_layer_transition_lock;
+static void (*after_unlock)(void);
 static uint32_t active_layers;
 static uint32_t locked_layers;
 static int layer_events;
@@ -106,6 +107,9 @@ static int k_mutex_lock(struct k_mutex *mutex, k_timeout_t timeout) {
 static void k_mutex_unlock(struct k_mutex *mutex) {
     assert(mutex->depth > 0);
     mutex->depth--;
+    if (after_unlock != NULL && mutex != &runtime_temp_layer_transition_lock && mutex->depth == 0) {
+        void (*hook)(void) = after_unlock; after_unlock = NULL; hook();
+    }
 }
 static struct k_work_q *zmk_workqueue_lowprio_work_q(void) { return &lowprio_queue; }
 static void k_work_init(struct k_work *work, void (*handler)(struct k_work *work)) {
@@ -120,10 +124,13 @@ static struct k_work_delayable *k_work_delayable_from_work(struct k_work *work) 
 }
 static int k_work_submit_to_queue(struct k_work_q *queue, struct k_work *work) {
     assert(queue == &lowprio_queue);
+    if (work->canceling) { return -EBUSY; }
     work->pending = true;
-    return 1;
+    return work->running ? 2 : 1;
 }
+static int k_work_cancel(struct k_work *work) __attribute__((unused));
 static int k_work_cancel(struct k_work *work) {
+    work->canceling = work->running;
     work->pending = false;
     return 0;
 }
@@ -184,7 +191,9 @@ static void bump_generation(void) { atomic_inc(&data.generation); }
 
 static void run_activate(void) {
     data.activate_work.pending = false;
+    data.activate_work.running = true;
     data.activate_work.handler(&data.activate_work);
+    data.activate_work.running = data.activate_work.canceling = false;
 }
 
 static void run_deactivate(void) {
@@ -419,7 +428,9 @@ static void test_settings_while_held(void) {
     data.activation_pending = true;
     data.activate_work.pending = true;
     assert(runtime_temp_layer_set_params(&valid_device, &retimed) == 0);
-    assert(!data.activation_pending && !data.activate_work.pending);
+    assert(!data.activation_pending);
+    run_activate(); /* retired queued work must not apply the old request */
+    assert(!data.activate_work.pending && data.active_layer == 2);
     assert(data.deactivate_at == 20300 && data.deactivate_work.delay_ms == 300);
     assert(data.active_layer == 2 && data.params.layer == 3);
 
@@ -557,6 +568,28 @@ static void test_transition_lock_cleanup(void) {
     assert(!data.is_active && runtime_temp_layer_transition_lock.depth == 0);
 }
 
+static void edit_and_requeue(void) {
+    const struct runtime_temp_layer_params p = params_of(true, 2, 0, 0);
+    assert(data.activate_work.running);
+    assert(runtime_temp_layer_set_params(&valid_device, &p) == 0);
+    active_layers = 0; /* remove the blocker before the one new input */
+    assert(input() == 0);
+    assert(data.activate_work.pending && "running cancellation rejected new activation");
+}
+
+static void test_running_requeue(void) {
+    data.is_active = false;
+    data.params = params_of(true, 2, 0, 0);
+    active_layers = 1U << 5; /* first callback has no layer transition to perform */
+    assert(input() == 0);
+    after_unlock = edit_and_requeue;
+    run_activate();
+    assert(data.activate_work.pending && data.activation_pending);
+    run_activate();
+    assert(data.is_active && zmk_keymap_layer_active(2));
+    assert(position(0, true) == 0);
+}
+
 static void test_clock_wrap(void) {
     active_layers = 0;
     locked_layers = 0;
@@ -590,6 +623,7 @@ int main(void) {
     test_settings_while_held();
     test_events();
     test_transition_lock_cleanup();
+    test_running_requeue();
     test_clock_wrap();
     assert(data.lock.depth == 0);
     assert(runtime_temp_layer_transition_lock.depth == 0);
